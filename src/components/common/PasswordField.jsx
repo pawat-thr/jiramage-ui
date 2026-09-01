@@ -39,9 +39,12 @@ export default function PasswordField({ reveal = false, className = '', ...props
       <button
         type="button"
         tabIndex={-1}
+        // While an outside "Show password" checkbox forces reveal, disable the
+        // per-field eye so its state can't desync from the checkbox.
+        disabled={reveal}
         aria-label={visible ? 'Hide password' : 'Show password'}
         title={visible ? 'Hide password' : 'Show password'}
-        className="absolute top-1/2 right-3 -translate-y-1/2 text-muted transition-colors hover:text-ink"
+        className="absolute top-1/2 right-3 -translate-y-1/2 text-muted transition-colors hover:text-ink disabled:pointer-events-none disabled:opacity-40"
         onClick={() => setShow((s) => !s)}
       >
         <EyeIcon off={visible} />

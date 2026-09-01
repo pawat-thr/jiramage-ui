@@ -80,9 +80,9 @@ export default function LoginPage({ auth }) {
           {tab('activate', 'First time')}
         </div>
 
-        {error && (
+        {(error || auth.error) && (
           <div className="mb-4 rounded-xl border border-danger bg-danger-soft px-4 py-3 text-[13px] text-danger">
-            {error}
+            {error || auth.error}
           </div>
         )}
 

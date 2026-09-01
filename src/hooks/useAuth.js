@@ -17,7 +17,11 @@ export function useAuth() {
       // Defense in depth: if a signed-in account isn't allowlisted, sign it out.
       if (u && !isAllowed(u.email)) {
         setError('This account is not on the team allowlist.')
-        await logout()
+        try {
+          await logout()
+        } catch {
+          // ignore sign-out failure; user state is cleared regardless
+        }
         setUser(null)
       } else {
         setUser(mapUser(u))
