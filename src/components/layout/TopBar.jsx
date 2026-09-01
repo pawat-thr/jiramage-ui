@@ -52,12 +52,14 @@ export default function TopBar({ title, updatedAt, user, onLogout, onToggleColla
             <span className="max-w-[140px] truncate font-medium text-ink-soft" title={user.email}>
               {user.name}
             </span>
-            <button
-              className="rounded-full border border-line bg-panel px-3 py-1.5 text-xs text-ink-soft transition-colors hover:border-danger hover:text-danger"
-              onClick={onLogout}
-            >
-              Sign out
-            </button>
+            {onLogout && (
+              <button
+                className="rounded-full border border-line bg-panel px-3 py-1.5 text-xs text-ink-soft transition-colors hover:border-danger hover:text-danger"
+                onClick={onLogout}
+              >
+                Sign out
+              </button>
+            )}
           </span>
         )}
       </div>

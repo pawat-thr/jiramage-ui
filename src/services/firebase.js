@@ -1,5 +1,6 @@
 import { initializeApp } from 'firebase/app'
 import { getAuth } from 'firebase/auth'
+import { getFirestore } from 'firebase/firestore'
 
 // Web config from .env (VITE_FIREBASE_*). These are not secrets — Firebase is
 // secured by Auth + Security Rules, not by hiding this config.
@@ -17,4 +18,6 @@ const cfg = {
 export const firebaseEnabled =
   Boolean(cfg.apiKey) && !String(cfg.apiKey).includes('REPLACE')
 
-export const auth = firebaseEnabled ? getAuth(initializeApp(cfg)) : null
+const app = firebaseEnabled ? initializeApp(cfg) : null
+export const auth = app ? getAuth(app) : null
+export const db = app ? getFirestore(app) : null

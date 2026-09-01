@@ -7,6 +7,7 @@ import ReassignModal from './features/issues/ReassignModal.jsx'
 import DashboardPage from './pages/DashboardPage.jsx'
 import MyTasksPage from './pages/MyTasksPage.jsx'
 import TeamPage from './pages/TeamPage.jsx'
+import PrBoardPage from './pages/PrBoardPage.jsx'
 import SettingsPage from './pages/SettingsPage.jsx'
 import LoginPage from './pages/LoginPage.jsx'
 import Spinner from './components/common/Spinner.jsx'
@@ -14,13 +15,16 @@ import { useJiraData } from './hooks/useJiraData.js'
 import { useToast } from './hooks/useToast.js'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts.js'
 import { useAuth } from './hooks/useAuth.js'
+import { firebaseEnabled } from './services/firebase.js'
 
+// PR Review needs Firebase (multi-user Firestore); it only appears in team mode.
 const NAV_ITEMS = [
-  { id: 'dashboard', label: 'Dashboard', key: '1' },
-  { id: 'my', label: 'My Tasks', key: '2' },
-  { id: 'team', label: 'Team', key: '3' },
-  { id: 'settings', label: 'Settings', key: '4' },
-]
+  { id: 'dashboard', label: 'Dashboard' },
+  { id: 'my', label: 'My Tasks' },
+  { id: 'team', label: 'Team' },
+  ...(firebaseEnabled ? [{ id: 'pr', label: 'PR Review' }] : []),
+  { id: 'settings', label: 'Settings' },
+].map((t, i) => ({ ...t, key: String(i + 1) }))
 const NAV_KEYS = Object.fromEntries(NAV_ITEMS.map((t) => [t.key, t.id]))
 const PAGE_TITLES = Object.fromEntries(NAV_ITEMS.map((t) => [t.id, t.label]))
 
@@ -129,6 +133,7 @@ function AppShell({ user, onLogout }) {
               onReassign={openReassign}
             />
           )}
+          {tab === 'pr' && <PrBoardPage user={user} onNotify={showToast} />}
           {tab === 'settings' && <SettingsPage onNotify={showToast} user={user} />}
           </div>
         </main>

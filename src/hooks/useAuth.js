@@ -1,13 +1,18 @@
 import { useEffect, useState } from 'react'
 import { firebaseEnabled } from '../services/firebase.js'
 import { watchAuth, signIn, activate, logout, isAllowed } from '../services/firebaseAuth.js'
+import { CFG } from '../config/appConfig.js'
 import { emailUsername } from '../utils/format.js'
 
 const mapUser = (u) =>
   u && { name: u.displayName || emailUsername(u.email || ''), email: u.email || '' }
 
+// Individual mode (no Firebase): the single user is the configured JIRA_EMAIL,
+// no login required.
+const individualUser = { name: emailUsername(CFG.email || 'user'), email: CFG.email || '' }
+
 export function useAuth() {
-  const [user, setUser] = useState(null)
+  const [user, setUser] = useState(firebaseEnabled ? null : individualUser)
   const [ready, setReady] = useState(!firebaseEnabled)
   const [error, setError] = useState(null)
 
