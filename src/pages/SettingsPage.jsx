@@ -14,9 +14,9 @@ const field =
 const editable =
   'w-full rounded-xl border border-line bg-field px-3.5 py-2 text-sm text-ink placeholder:text-muted'
 
-function Section({ title, children }) {
+function Section({ title, children, allowOverflow }) {
   return (
-    <div className={card}>
+    <div className={cx(card, allowOverflow && 'overflow-visible!')}>
       <div className="border-b border-line px-5 py-3.5">
         <h2 className="text-sm font-semibold">{title}</h2>
       </div>

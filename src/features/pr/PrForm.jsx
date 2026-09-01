@@ -53,8 +53,8 @@ export default function PrForm({ pr, onClose, onSubmit }) {
   }
 
   return (
-    <ModalShell title={pr ? 'Edit PR' : 'New PR'} subtitle="" onClose={onClose}>
-      <form onSubmit={submit} className="grid max-h-[65vh] gap-4 overflow-y-auto pr-1">
+    <ModalShell title={pr ? 'Edit PR' : 'New PR'} subtitle="" onClose={onClose} wide>
+      <form onSubmit={submit} className="grid max-h-[72vh] gap-4 overflow-y-auto pr-1">
         {error && (
           <div className="rounded-xl border border-danger bg-danger-soft px-4 py-2.5 text-[13px] text-danger">
             {error}

@@ -5,7 +5,7 @@ import { CFG } from '../config/appConfig.js'
 import { emailUsername } from '../utils/format.js'
 
 const mapUser = (u) =>
-  u && { name: u.displayName || emailUsername(u.email || ''), email: u.email || '' }
+  u && { name: u.displayName || emailUsername(u.email || ''), email: u.email || '', uid: u.uid }
 
 // Individual mode (no Firebase): the single user is the configured JIRA_EMAIL,
 // no login required.

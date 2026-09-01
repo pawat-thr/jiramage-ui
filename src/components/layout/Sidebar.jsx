@@ -21,6 +21,26 @@ const ICONS = {
       <circle cx="18" cy="18" r="2.5" />
     </>
   ),
+  story: (
+    <>
+      <path d="M4 5a2 2 0 0 1 2-2h9l5 5v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z" />
+      <path d="M14 3v5h5M8 13h8M8 17h5" />
+    </>
+  ),
+  delivery: (
+    <>
+      <path d="M3 7h11v9H3zM14 10h4l3 3v3h-7z" />
+      <circle cx="7" cy="18.5" r="1.6" />
+      <circle cx="17" cy="18.5" r="1.6" />
+    </>
+  ),
+  board: (
+    <>
+      <rect x="3.5" y="4" width="5" height="16" rx="1.2" />
+      <rect x="9.5" y="4" width="5" height="10" rx="1.2" />
+      <rect x="15.5" y="4" width="5" height="7" rx="1.2" />
+    </>
+  ),
   settings: (
     <>
       <circle cx="12" cy="12" r="3" />

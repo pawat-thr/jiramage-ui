@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import PrStatusBadge from './PrStatusBadge.jsx'
-import { PR_STATUSES, fmtTime } from './prConstants.js'
+import { PR_STATUSES, statusMeta, fmtTime, avatarColor, initials } from './prConstants.js'
 import { watchComments, addComment, setStatus } from '../../services/prApi.js'
 import { emailUsername } from '../../utils/format.js'
 import { cx, card } from '../../utils/ui.js'
@@ -90,7 +90,10 @@ export default function PrDetail({ pr, user, onBack, onEdit, onDelete, onNotify 
         )}
       </div>
 
-      <div className={`${card} p-5`}>
+      <div
+        className={`${card} p-5 pl-6`}
+        style={{ borderLeftColor: statusMeta(pr.status).color, borderLeftWidth: '4px' }}
+      >
         <div className="flex flex-wrap items-start justify-between gap-3">
           <h2 className="text-lg font-semibold">{pr.title}</h2>
           <PrStatusBadge status={pr.status} />
@@ -113,8 +116,14 @@ export default function PrDetail({ pr, user, onBack, onEdit, onDelete, onNotify 
             {(pr.reviewers || []).map((email) => (
               <span
                 key={email}
-                className="rounded-full border border-line bg-field px-3 py-1 text-[13px] text-ink-soft"
+                className="flex items-center gap-1.5 rounded-full border border-line bg-field py-1 pr-3 pl-1 text-[13px] text-ink-soft"
               >
+                <span
+                  className="grid size-5 place-items-center rounded-full text-[10px] font-bold text-bg"
+                  style={{ background: avatarColor(email) }}
+                >
+                  {initials(emailUsername(email))}
+                </span>
                 {emailUsername(email)}
               </span>
             ))}
@@ -154,39 +163,62 @@ export default function PrDetail({ pr, user, onBack, onEdit, onDelete, onNotify 
       </div>
 
       <div className={`${card} p-5`}>
-        <h3 className="text-sm font-semibold">Comments</h3>
-        <div className="mt-3 grid gap-3">
+        <h3 className="text-sm font-semibold">
+          Comments <span className="text-muted">({comments.length})</span>
+        </h3>
+        <div className="mt-4 grid gap-4">
           {comments.length === 0 && (
-            <p className="text-[13px] text-muted">No comments yet.</p>
+            <p className="text-[13px] text-muted">No comments yet — start the discussion.</p>
           )}
-          {comments.map((c) => (
-            <div key={c.id} className="rounded-xl border border-line bg-field px-4 py-3">
-              <div className="flex items-baseline justify-between gap-2">
-                <span className="text-[13px] font-medium text-ink-soft">
-                  {emailUsername(c.authorEmail || c.authorName || '')}
+          {comments.map((c) => {
+            const who = emailUsername(c.authorEmail || c.authorName || '')
+            return (
+              <div key={c.id} className="flex gap-3">
+                <span
+                  className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-full text-xs font-bold text-bg"
+                  style={{ background: avatarColor(c.authorEmail || who) }}
+                >
+                  {initials(who)}
                 </span>
-                <span className="text-xs text-muted">{fmtTime(c.createdAt)}</span>
+                <div className="min-w-0 flex-1 rounded-2xl rounded-tl-sm border border-line bg-field px-4 py-2.5">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="text-[13px] font-semibold text-ink">{who}</span>
+                    <span className="text-xs text-muted">{fmtTime(c.createdAt)}</span>
+                  </div>
+                  <p className="mt-1 text-sm whitespace-pre-wrap text-ink-soft">{c.body}</p>
+                </div>
               </div>
-              <p className="mt-1 text-sm whitespace-pre-wrap text-ink">{c.body}</p>
-            </div>
-          ))}
+            )
+          })}
         </div>
 
-        <form onSubmit={postComment} className="mt-4 grid gap-2">
-          <textarea
-            className="min-h-20 w-full resize-y rounded-xl border border-line bg-field px-3.5 py-2 text-sm text-ink placeholder:text-muted"
-            placeholder="Write a comment…"
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-          />
-          <div className="flex justify-end">
-            <button
-              type="submit"
-              disabled={posting || !body.trim()}
-              className="rounded-full border border-accent bg-accent-soft px-5 py-2 text-sm font-semibold text-accent-bright transition-colors hover:bg-accent hover:text-bg disabled:opacity-50"
-            >
-              {posting ? 'Posting…' : 'Comment'}
-            </button>
+        <form onSubmit={postComment} className="mt-5 flex gap-3">
+          <span
+            className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-full text-xs font-bold text-bg"
+            style={{ background: avatarColor(user.email) }}
+          >
+            {initials(user.name)}
+          </span>
+          <div className="min-w-0 flex-1">
+            <textarea
+              className="min-h-20 w-full resize-y rounded-2xl border border-line bg-field px-3.5 py-2.5 text-sm text-ink transition-colors placeholder:text-muted focus:border-accent"
+              placeholder="Write a comment…"
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) postComment(e)
+              }}
+            />
+            <div className="mt-2 flex items-center justify-between">
+              <span className="text-xs text-muted">⌘/Ctrl + Enter to post</span>
+              <button
+                type="submit"
+                disabled={posting || !body.trim()}
+                className="rounded-full border border-accent bg-accent-soft px-5 py-2 text-sm font-semibold text-accent-bright transition-colors hover:bg-accent hover:text-bg disabled:opacity-50"
+              >
+                {posting ? 'Posting…' : 'Comment'}
+              </button>
+            </div>
           </div>
         </form>
       </div>

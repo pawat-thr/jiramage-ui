@@ -1,0 +1,77 @@
+rules_version = '2';
+
+// Firestore Security Rules. Identity = Firebase Auth. Publish in the Firebase
+// console: Build → Firestore Database → Rules → paste → Publish.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null && request.auth.token.email != null;
+    }
+    function email() {
+      return request.auth.token.email;
+    }
+    function changed() {
+      return request.resource.data.diff(resource.data).affectedKeys();
+    }
+
+    // Per-user preferences (e.g. default Story List Release). Owner only.
+    match /userPrefs/{uid} {
+      allow read, write: if signedIn() && request.auth.uid == uid;
+    }
+
+    // Team Board labels: any member can create, rename (name only), or delete.
+    // (The app only allows deleting labels with zero tasks.)
+    match /labels/{labelId} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.resource.data.authorEmail == email();
+      allow update: if signedIn() && changed().hasOnly(['name']);
+      allow delete: if signedIn();
+    }
+
+    // Team Board tasks: owner edits/deletes; anyone signed in may change status.
+    match /tasks/{taskId} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.resource.data.authorEmail == email();
+      allow update: if signedIn() && (
+        ( resource.data.authorEmail == email()
+          && request.resource.data.authorEmail == resource.data.authorEmail )
+        ||
+        changed().hasOnly(['status', 'updatedAt'])
+        ||
+        // label renames cascade to every task, regardless of owner
+        changed().hasOnly(['label', 'updatedAt'])
+      );
+      allow delete: if signedIn() && resource.data.authorEmail == email();
+    }
+
+    // PR review board.
+    match /prs/{prId} {
+      allow read: if signedIn();
+
+      allow create: if signedIn()
+        && request.resource.data.authorEmail == email();
+
+      allow update: if signedIn() && (
+        ( resource.data.authorEmail == email()
+          && request.resource.data.authorEmail == resource.data.authorEmail )
+        ||
+        ( email() in resource.data.reviewers
+          && changed().hasOnly(['status', 'updatedAt']) )
+      );
+
+      allow delete: if signedIn() && resource.data.authorEmail == email();
+
+      match /comments/{commentId} {
+        allow read: if signedIn();
+        allow create: if signedIn()
+          && request.resource.data.authorEmail == email();
+        allow update, delete: if false;
+      }
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -74,6 +74,23 @@ export default function IssueTable({ issues, showAssignee, onTransition, onReass
                 >
                   {iss.fields.summary}
                 </div>
+                {iss.fields.parent && (
+                  <div className="mt-0.5 flex max-w-[480px] items-center gap-1.5 text-xs text-muted max-md:max-w-[200px]">
+                    <span className="shrink-0">↳</span>
+                    <a
+                      className="shrink-0 font-medium text-violet hover:underline"
+                      href={browseUrl(iss.fields.parent.key)}
+                      target="_blank"
+                      rel="noreferrer"
+                      title="Parent story"
+                    >
+                      {iss.fields.parent.key}
+                    </a>
+                    <span className="truncate" title={iss.fields.parent.fields?.summary}>
+                      {iss.fields.parent.fields?.summary}
+                    </span>
+                  </div>
+                )}
               </td>
               <td className={td}>
                 <StatusBadge status={iss.fields.status} />

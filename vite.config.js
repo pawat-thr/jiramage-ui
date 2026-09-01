@@ -32,6 +32,10 @@ export default defineConfig(({ mode }) => {
         projects: list(env.JIRA_PROJECT, true),
         teamFrom: (env.JIRA_TEAM_FROM || '2024-05-01').trim(),
         refreshMs: parseInterval(env.REFRESH_INTERVAL),
+        // Jira custom field id holding the "Release" on a card (option field).
+        releaseField: (env.JIRA_RELEASE_FIELD || 'customfield_10127').trim(),
+        // Jira custom field id holding story points (number field).
+        pointField: (env.JIRA_POINT_FIELD || 'customfield_10016').trim(),
       }),
     },
     test: {
@@ -55,7 +59,7 @@ export default defineConfig(({ mode }) => {
                   proxyReq.removeHeader(h)
                 }
               }
-              proxyReq.setHeader('User-Agent', 'jiramage-ui/0.1.0')
+              proxyReq.setHeader('User-Agent', 'jiramage-ui/0.1.5')
               proxyReq.setHeader('X-Atlassian-Token', 'no-check')
             })
           },

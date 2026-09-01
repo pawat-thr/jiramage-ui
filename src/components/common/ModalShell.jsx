@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { chip } from '../../utils/ui.js'
 
-export default function ModalShell({ title, subtitle, onClose, children }) {
+export default function ModalShell({ title, subtitle, onClose, wide = false, children }) {
   useEffect(() => {
     const onKey = (e) => e.key === 'Escape' && onClose()
     window.addEventListener('keydown', onKey)
@@ -10,11 +10,11 @@ export default function ModalShell({ title, subtitle, onClose, children }) {
 
   return (
     <div
-      className="fixed inset-0 z-50 grid animate-fade place-items-center bg-backdrop p-5"
+      className="zoom-normal fixed inset-0 z-50 grid animate-fade place-items-center bg-backdrop p-5"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div
-        className="w-full max-w-[440px] animate-pop rounded-[18px] border border-line bg-panel p-[22px] shadow-lift"
+        className={`w-full ${wide ? 'max-w-2xl' : 'max-w-[440px]'} animate-pop rounded-[18px] border border-line bg-panel p-[22px] shadow-lift`}
         role="dialog"
         aria-label={title}
       >

@@ -71,6 +71,28 @@ export function typeStats(issues) {
   return [...byName.values()].sort((a, b) => b.tier - a.tier || b.count - a.count)
 }
 
+// Active (not done) SUBTASKS per member, with story-point sums. Every
+// configured member is seeded so everyone shows even at zero.
+export function activeSubtaskPoints(issues) {
+  const byKey = new Map()
+  const seed = (key, name, isMe) => byKey.set(key, { key, name, isMe, count: 0, points: 0 })
+  seed(CFG.email, emailUsername(CFG.email), true)
+  CFG.teamEmails.forEach((e) => seed(e, emailUsername(e), false))
+
+  for (const iss of issues) {
+    if ((iss.fields.issuetype?.hierarchyLevel ?? 0) >= 0) continue // subtasks only
+    if ((iss.fields.status.statusCategory?.key || 'new') === 'done') continue // active only
+    const a = iss.fields.assignee
+    const key = a?.emailAddress || a?.displayName || 'unassigned'
+    if (!byKey.has(key)) seed(key, a ? shortName(a.displayName) : 'Unassigned', false)
+    const row = byKey.get(key)
+    if (a?.displayName) row.name = shortName(a.displayName)
+    row.count++
+    row.points += Number(iss.fields[CFG.pointField]) || 0
+  }
+  return [...byKey.values()].sort((a, b) => b.points - a.points || b.count - a.count)
+}
+
 export function summaryStats(teamIssues, myIssues) {
   const catCount = (issues, cat) =>
     (issues || []).filter((i) => (i.fields.status.statusCategory?.key || 'new') === cat).length

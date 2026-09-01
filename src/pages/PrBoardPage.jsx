@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import Spinner from '../components/common/Spinner.jsx'
 import FilterMenu from '../components/common/FilterMenu.jsx'
+import ConfirmDialog from '../components/common/ConfirmDialog.jsx'
 import PrStatusBadge from '../features/pr/PrStatusBadge.jsx'
 import PrForm from '../features/pr/PrForm.jsx'
 import PrDetail from '../features/pr/PrDetail.jsx'
@@ -15,8 +17,15 @@ const MEMBERS = [CFG.email, ...CFG.teamEmails]
 
 export default function PrBoardPage({ user, onNotify }) {
   const [prs, setPrs] = useState(null)
-  const [selectedId, setSelectedId] = useState(null)
+  // Detail view is URL-driven: /pr-review/<id>
+  const location = useLocation()
+  const navigate = useNavigate()
+  const selectedId = location.pathname.startsWith('/pr-review/')
+    ? location.pathname.slice('/pr-review/'.length)
+    : null
   const [form, setForm] = useState(null) // null | { pr } (pr undefined = create)
+  const [confirmPr, setConfirmPr] = useState(null) // PR pending delete
+  const [deleting, setDeleting] = useState(false)
   const [owner, setOwner] = useState('')
   const [status, setStatus] = useState('')
   const [reviewer, setReviewer] = useState('')
@@ -45,41 +54,6 @@ export default function PrBoardPage({ user, onNotify }) {
   const reviewerOptions = MEMBERS.map(emailUsername)
   const statusOptions = PR_STATUSES.map((s) => s.label)
 
-  if (!firebaseEnabled || !user) {
-    return (
-      <div className={card}>
-        <div className={emptyState}>Sign in with your team account to use the PR review board.</div>
-      </div>
-    )
-  }
-
-  if (selectedId) {
-    const pr = (prs || []).find((p) => p.id === selectedId)
-    if (!pr) {
-      setSelectedId(null)
-      return null
-    }
-    return (
-      <PrDetail
-        pr={pr}
-        user={user}
-        onBack={() => setSelectedId(null)}
-        onEdit={() => setForm({ pr })}
-        onNotify={onNotify}
-        onDelete={async () => {
-          if (!window.confirm(`Delete “${pr.title}”?`)) return
-          try {
-            await deletePR(pr.id)
-            onNotify('✓ PR deleted')
-            setSelectedId(null)
-          } catch (err) {
-            onNotify(err.message, true)
-          }
-        }}
-      />
-    )
-  }
-
   const submitForm = async (data) => {
     if (form?.pr) {
       await updatePR(form.pr.id, data)
@@ -91,56 +65,112 @@ export default function PrBoardPage({ user, onNotify }) {
     setForm(null)
   }
 
+  const confirmDelete = async () => {
+    setDeleting(true)
+    try {
+      await deletePR(confirmPr.id)
+      onNotify('✓ PR deleted')
+      setConfirmPr(null)
+      navigate('/pr-review')
+    } catch (err) {
+      onNotify(err.message, true)
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  const selected = selectedId ? (prs || []).find((p) => p.id === selectedId) : null
+
+  // If the open PR disappears (deleted elsewhere), fall back to the board.
+  useEffect(() => {
+    if (selectedId && prs && !prs.some((p) => p.id === selectedId))
+      navigate('/pr-review', { replace: true })
+  }, [selectedId, prs, navigate])
+
+  if (!firebaseEnabled || !user) {
+    return (
+      <div className={card}>
+        <div className={emptyState}>Sign in with your team account to use the PR review board.</div>
+      </div>
+    )
+  }
+
   return (
     <>
-      <div className={toolbar}>
-        <FilterMenu label="Owner" value={owner} options={ownerOptions} onPick={setOwner} />
-        <FilterMenu label="Status" value={status} options={statusOptions} onPick={setStatus} />
-        <FilterMenu label="Reviewer" value={reviewer} options={reviewerOptions} onPick={setReviewer} />
-        <span className="flex-1" />
-        <button
-          className={cx(chip, 'border-accent! bg-accent-soft! text-accent-bright!')}
-          onClick={() => setForm({})}
-        >
-          + New PR
-        </button>
-      </div>
-
-      {prs === null ? (
-        <Spinner label="Loading PRs…" />
-      ) : !visible.length ? (
-        <div className={card}>
-          <div className={emptyState}>
-            {prs.length ? 'No PRs match the filters.' : 'No PRs yet — create the first one.'}
-          </div>
+      {selected ? (
+        <div key={selected.id} className="animate-enter">
+        <PrDetail
+          pr={selected}
+          user={user}
+          onBack={() => navigate('/pr-review')}
+          onEdit={() => setForm({ pr: selected })}
+          onNotify={onNotify}
+          onDelete={() => setConfirmPr(selected)}
+        />
         </div>
       ) : (
-        <div className="grid gap-3">
-          {visible.map((pr) => (
+        <div key="pr-board" className="animate-enter">
+          <div className={toolbar}>
+            <FilterMenu label="Owner" value={owner} options={ownerOptions} onPick={setOwner} />
+            <FilterMenu label="Status" value={status} options={statusOptions} onPick={setStatus} />
+            <FilterMenu label="Reviewer" value={reviewer} options={reviewerOptions} onPick={setReviewer} />
+            <span className="flex-1" />
             <button
-              key={pr.id}
-              onClick={() => setSelectedId(pr.id)}
-              className={`${card} p-4 text-left transition-colors hover:border-accent`}
+              className={cx(chip, 'border-accent! bg-accent-soft! text-accent-bright!')}
+              onClick={() => setForm({})}
             >
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <h3 className="truncate font-semibold text-ink">{pr.title}</h3>
-                  <p className="mt-0.5 text-xs text-muted">
-                    by {emailUsername(pr.authorEmail || '')} · {(pr.reviewers || []).length} reviewer
-                    {(pr.reviewers || []).length === 1 ? '' : 's'} · updated {fmtTime(pr.updatedAt)}
-                  </p>
-                </div>
-                <PrStatusBadge status={pr.status} />
-              </div>
-              {pr.detail && (
-                <p className="mt-2 line-clamp-2 text-[13px] text-ink-soft">{pr.detail}</p>
-              )}
+              + New PR
             </button>
-          ))}
+          </div>
+
+          {prs === null ? (
+            <Spinner label="Loading PRs…" />
+          ) : !visible.length ? (
+            <div className={card}>
+              <div className={emptyState}>
+                {prs.length ? 'No PRs match the filters.' : 'No PRs yet — create the first one.'}
+              </div>
+            </div>
+          ) : (
+            <div className="grid gap-3">
+              {visible.map((pr) => (
+                <button
+                  key={pr.id}
+                  onClick={() => navigate(`/pr-review/${pr.id}`)}
+                  style={{ borderLeftColor: statusMeta(pr.status).color, borderLeftWidth: '4px' }}
+                  className={`${card} p-4 pl-5 text-left transition-all hover:-translate-y-0.5 hover:border-accent`}
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h3 className="truncate font-semibold text-ink">{pr.title}</h3>
+                      <p className="mt-0.5 text-xs text-muted">
+                        by {emailUsername(pr.authorEmail || '')} · {(pr.reviewers || []).length}{' '}
+                        reviewer{(pr.reviewers || []).length === 1 ? '' : 's'} · updated{' '}
+                        {fmtTime(pr.updatedAt)}
+                      </p>
+                    </div>
+                    <PrStatusBadge status={pr.status} />
+                  </div>
+                  {pr.detail && (
+                    <p className="mt-2 line-clamp-2 text-[13px] text-ink-soft">{pr.detail}</p>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
       {form && <PrForm pr={form.pr} onClose={() => setForm(null)} onSubmit={submitForm} />}
+      {confirmPr && (
+        <ConfirmDialog
+          title="Delete this PR?"
+          message={`“${confirmPr.title}” and its comments will be permanently removed. This can’t be undone.`}
+          busy={deleting}
+          onClose={() => setConfirmPr(null)}
+          onConfirm={confirmDelete}
+        />
+      )}
     </>
   )
 }
