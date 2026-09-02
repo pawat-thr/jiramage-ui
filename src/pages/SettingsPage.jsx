@@ -6,6 +6,8 @@ import { THEME_OPTIONS } from '../utils/theme.js'
 import { firebaseEnabled } from '../services/firebase.js'
 import { changePassword } from '../services/firebaseAuth.js'
 import { validatePassword, PASSWORD_RULES } from '../utils/password.js'
+import { getNotifSound, setNotifSound } from '../utils/prefs.js'
+import { playPing } from '../utils/notifSound.js'
 import PasswordField from '../components/common/PasswordField.jsx'
 
 const label = 'block text-xs font-medium text-muted mb-1.5'
@@ -151,6 +153,7 @@ function ZoneHeader({ title, hint }) {
 // Display + Account are live settings; everything below is read from .env.
 export default function SettingsPage({ onNotify, user }) {
   const [theme, setTheme] = useTheme()
+  const [soundOn, setSoundOn] = useState(getNotifSound())
 
   return (
     <div className="mx-auto grid w-full max-w-3xl gap-4">
@@ -182,6 +185,39 @@ export default function SettingsPage({ onNotify, user }) {
             “System” follows your device’s light/dark setting.
           </p>
         </div>
+        {firebaseEnabled && (
+          <div className="border-t border-line pt-4">
+            <span className={label}>Notification sound</span>
+            <div className="inline-flex rounded-xl border border-line bg-field p-1">
+              {[
+                [true, 'On'],
+                [false, 'Off'],
+              ].map(([on, text]) => (
+                <button
+                  key={text}
+                  className={cx(
+                    'rounded-lg px-5 py-2 text-sm font-medium transition-colors',
+                    soundOn === on
+                      ? 'bg-accent-soft text-accent-bright'
+                      : 'text-ink-soft hover:text-ink',
+                  )}
+                  onClick={() => {
+                    setNotifSound(on)
+                    setSoundOn(on)
+                    if (on) playPing()
+                  }}
+                >
+                  {text}
+                </button>
+              ))}
+            </div>
+            <p className="mt-2 text-xs text-muted">
+              Plays a short ping when a new inbox notification arrives, and a softer reminder
+              every {Math.round(CFG.refreshMs / 60000)} minutes while unread items remain. Saved
+              to this browser.
+            </p>
+          </div>
+        )}
       </Section>
 
       {firebaseEnabled && user && (

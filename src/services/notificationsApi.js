@@ -5,6 +5,7 @@ import {
   onSnapshot,
   writeBatch,
   updateDoc,
+  deleteDoc,
   doc,
   serverTimestamp,
 } from 'firebase/firestore'
@@ -29,6 +30,8 @@ export function watchInbox(toEmail, cb, onError) {
 
 export const markRead = (id) => updateDoc(notifDoc(id), { read: true })
 
+export const deleteNotification = (id) => deleteDoc(notifDoc(id))
+
 export function markAllRead(ids) {
   const batch = writeBatch(db)
   for (const id of ids) batch.update(notifDoc(id), { read: true })
@@ -36,18 +39,21 @@ export function markAllRead(ids) {
 }
 
 // One notification per recipient (self excluded), written in a single batch.
-export function notifyReviewers({ prId, prTitle, from, toEmails }) {
+// type: 'pr_review_assigned' | 'pr_status_changed' | 'pr_comment'
+// extra: type-specific fields (e.g. { statusLabel } for status changes).
+export function sendNotifications({ type, toEmails, from, refId, title, extra = {} }) {
   const targets = (toEmails || []).filter((e) => e && e !== from.email)
   if (!targets.length) return Promise.resolve()
   const batch = writeBatch(db)
   for (const toEmail of targets) {
     batch.set(doc(notifCol()), {
-      type: 'pr_review_assigned',
+      type,
       toEmail,
       fromEmail: from.email,
       fromName: from.name || from.email,
-      refId: prId,
-      title: prTitle,
+      refId,
+      title,
+      ...extra,
       read: false,
       createdAt: serverTimestamp(),
     })

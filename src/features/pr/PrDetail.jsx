@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import PrStatusBadge from './PrStatusBadge.jsx'
 import { PR_STATUSES, statusMeta, fmtTime, avatarColor, initials } from './prConstants.js'
 import { watchComments, addComment, setStatus } from '../../services/prApi.js'
+import { sendNotifications } from '../../services/notificationsApi.js'
 import { emailUsername } from '../../utils/format.js'
 import { cx, card } from '../../utils/ui.js'
 
@@ -39,6 +40,16 @@ export default function PrDetail({ pr, user, onBack, onEdit, onDelete, onNotify 
   const changeStatus = async (id) => {
     try {
       await setStatus(pr.id, id)
+      // Tell the PR owner their post changed status (skipped when the owner
+      // did it themselves — sendNotifications filters out self).
+      sendNotifications({
+        type: 'pr_status_changed',
+        toEmails: [pr.authorEmail],
+        from: user,
+        refId: pr.id,
+        title: pr.title,
+        extra: { statusLabel: statusMeta(id).label },
+      }).catch((err) => console.warn('[notify] status-change inbox write failed:', err.message))
     } catch (err) {
       onNotify(err.message, true)
     }
@@ -55,6 +66,14 @@ export default function PrDetail({ pr, user, onBack, onEdit, onDelete, onNotify 
         body: body.trim(),
       })
       setBody('')
+      // Tell the PR owner someone commented on their post (self filtered out).
+      sendNotifications({
+        type: 'pr_comment',
+        toEmails: [pr.authorEmail],
+        from: user,
+        refId: pr.id,
+        title: pr.title,
+      }).catch((err) => console.warn('[notify] comment inbox write failed:', err.message))
     } catch (err) {
       onNotify(err.message, true)
     } finally {

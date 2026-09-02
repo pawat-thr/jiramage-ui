@@ -12,6 +12,7 @@ import StoryListPage from './pages/StoryListPage.jsx'
 import TeamBoardPage from './pages/TeamBoardPage.jsx'
 import DeliveryPage from './pages/DeliveryPage.jsx'
 import PrBoardPage from './pages/PrBoardPage.jsx'
+import InboxPage from './pages/InboxPage.jsx'
 import SettingsPage from './pages/SettingsPage.jsx'
 import LoginPage from './pages/LoginPage.jsx'
 import Spinner from './components/common/Spinner.jsx'
@@ -33,6 +34,7 @@ const NAV_ITEMS = [
     ? [
         { id: 'board', label: 'Team Board', path: '/team-board' },
         { id: 'pr', label: 'PR Review', path: '/pr-review' },
+        { id: 'inbox', label: 'Inbox', path: '/inbox' },
       ]
     : []),
   { id: 'settings', label: 'Settings', path: '/settings' },
@@ -201,6 +203,7 @@ function AppShell({ user, onLogout }) {
           )}
           {tab === 'board' && <TeamBoardPage user={user} onNotify={showToast} />}
           {tab === 'pr' && <PrBoardPage user={user} onNotify={showToast} />}
+          {tab === 'inbox' && <InboxPage user={user} onNotify={showToast} />}
           {tab === 'settings' && <SettingsPage onNotify={showToast} user={user} />}
           </div>
         </main>

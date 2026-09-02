@@ -8,7 +8,7 @@ import PrForm from '../features/pr/PrForm.jsx'
 import PrDetail from '../features/pr/PrDetail.jsx'
 import { PR_STATUSES, statusMeta, fmtTime } from '../features/pr/prConstants.js'
 import { watchPRs, createPR, updatePR, deletePR } from '../services/prApi.js'
-import { notifyReviewers } from '../services/notificationsApi.js'
+import { sendNotifications } from '../services/notificationsApi.js'
 import { firebaseEnabled } from '../services/firebase.js'
 import { CFG } from '../config/appConfig.js'
 import { emailUsername, uniqueSorted } from '../utils/format.js'
@@ -73,9 +73,13 @@ export default function PrBoardPage({ user, onNotify }) {
     }
     setForm(null)
     // Inbox entries are best-effort: a failure here must not undo the PR save.
-    notifyReviewers({ prId, prTitle: data.title, from: user, toEmails: newReviewers }).catch(
-      () => {},
-    )
+    sendNotifications({
+      type: 'pr_review_assigned',
+      toEmails: newReviewers,
+      from: user,
+      refId: prId,
+      title: data.title,
+    }).catch((err) => console.warn('[notify] reviewer inbox write failed:', err.message))
   }
 
   const confirmDelete = async () => {

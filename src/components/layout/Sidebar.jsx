@@ -41,6 +41,12 @@ const ICONS = {
       <rect x="15.5" y="4" width="5" height="7" rx="1.2" />
     </>
   ),
+  inbox: (
+    <>
+      <path d="M4 5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z" />
+      <path d="M4 14h4.5l1.5 2.5h4l1.5-2.5H20" />
+    </>
+  ),
   settings: (
     <>
       <circle cx="12" cy="12" r="3" />
