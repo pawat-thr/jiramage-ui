@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { CFG } from '../config/appConfig.js'
-import { card, chip, cx } from '../utils/ui.js'
+import { card, cx } from '../utils/ui.js'
 import { useTheme } from '../hooks/useTheme.js'
 import { THEME_OPTIONS } from '../utils/theme.js'
 import { firebaseEnabled } from '../services/firebase.js'
@@ -9,18 +9,56 @@ import { validatePassword, PASSWORD_RULES } from '../utils/password.js'
 import PasswordField from '../components/common/PasswordField.jsx'
 
 const label = 'block text-xs font-medium text-muted mb-1.5'
-const field =
-  'w-full rounded-xl border border-line bg-field px-3.5 py-2 text-sm text-ink-soft disabled:opacity-70'
 const editable =
   'w-full rounded-xl border border-line bg-field px-3.5 py-2 text-sm text-ink placeholder:text-muted'
 
-function Section({ title, children, allowOverflow }) {
+function LockIcon() {
   return (
-    <div className={cx(card, allowOverflow && 'overflow-visible!')}>
-      <div className="border-b border-line px-5 py-3.5">
+    <svg
+      viewBox="0 0 24 24"
+      className="size-3.5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <rect x="4" y="11" width="16" height="9" rx="2" />
+      <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+    </svg>
+  )
+}
+
+// `locked` sections show a "Fixed · .env" badge and render values as plain
+// read-only rows instead of fake form inputs.
+function Section({ title, locked, children }) {
+  return (
+    <div className={card}>
+      <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-3.5">
         <h2 className="text-sm font-semibold">{title}</h2>
+        {locked ? (
+          <span className="flex items-center gap-1.5 rounded-full border border-line bg-field px-2.5 py-1 text-[11px] font-medium text-muted">
+            <LockIcon />
+            Fixed · .env
+          </span>
+        ) : (
+          <span className="rounded-full border border-accent bg-accent-soft px-2.5 py-1 text-[11px] font-medium text-accent-bright">
+            Editable
+          </span>
+        )}
       </div>
       <div className="grid gap-4 p-5">{children}</div>
+    </div>
+  )
+}
+
+// One read-only config row: label on the left, value on the right.
+function Row({ name, children }) {
+  return (
+    <div className="grid items-baseline gap-1 sm:grid-cols-[180px_1fr] sm:gap-4">
+      <span className="text-xs font-medium text-muted">{name}</span>
+      <span className="min-w-0 text-sm break-words text-ink-soft">{children || '—'}</span>
     </div>
   )
 }
@@ -101,17 +139,25 @@ function ChangePassword({ onNotify }) {
 
 const THEME_LABELS = { light: 'Light', dark: 'Dark', system: 'System' }
 
-// Connection/team/preferences are read-only mocks; Display and Account are live.
+function ZoneHeader({ title, hint }) {
+  return (
+    <div className="mt-2 first:mt-0">
+      <h2 className="text-sm font-semibold text-ink">{title}</h2>
+      <p className="mt-0.5 text-xs text-muted">{hint}</p>
+    </div>
+  )
+}
+
+// Display + Account are live settings; everything below is read from .env.
 export default function SettingsPage({ onNotify, user }) {
   const [theme, setTheme] = useTheme()
 
   return (
     <div className="mx-auto grid w-full max-w-3xl gap-4">
-      <div className="rounded-xl border border-line bg-panel-soft px-4 py-3 text-[13px] text-muted">
-        Most settings here are a mock read from{' '}
-        <code className="text-accent-bright">.env</code>. The <strong>Display</strong> theme
-        below is live and saved to this browser.
-      </div>
+      <ZoneHeader
+        title="Your settings"
+        hint="These are yours to change — saved instantly, no restart needed."
+      />
 
       <Section title="Display">
         <div>
@@ -140,10 +186,7 @@ export default function SettingsPage({ onNotify, user }) {
 
       {firebaseEnabled && user && (
         <Section title="Account">
-          <div>
-            <span className={label}>Signed in as</span>
-            <input className={field} disabled value={user.email} />
-          </div>
+          <Row name="Signed in as">{user.email}</Row>
           <div className="mt-1 border-t border-line pt-5">
             <h3 className="text-sm font-semibold text-ink">Change password</h3>
             <p className="mt-0.5 mb-4 text-xs text-muted">
@@ -154,63 +197,46 @@ export default function SettingsPage({ onNotify, user }) {
         </Section>
       )}
 
-      <Section title="Connection">
-        <div>
-          <span className={label}>Jira URL</span>
-          <input className={field} disabled value={CFG.jiraUrl} />
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <span className={label}>Email</span>
-            <input className={field} disabled value={CFG.email} />
-          </div>
-          <div>
-            <span className={label}>API token</span>
-            <input className={field} disabled type="password" value="••••••••••••••••" />
-          </div>
-        </div>
-        <div>
-          <span className={label}>Projects</span>
-          <input className={field} disabled value={CFG.projects.join(', ') || '—'} />
-        </div>
+      <ZoneHeader
+        title="Fixed configuration"
+        hint={
+          <>
+            Read from the <code className="text-accent-bright">.env</code> file and shown here for
+            reference only — to change anything below, edit <code>.env</code> and restart the app.
+          </>
+        }
+      />
+
+      <Section title="Connection" locked>
+        <Row name="Jira URL">{CFG.jiraUrl}</Row>
+        <Row name="Email">{CFG.email}</Row>
+        <Row name="API token">••••••••••••••••</Row>
+        <Row name="Projects">{CFG.projects.join(', ')}</Row>
       </Section>
 
-      <Section title="Team">
-        <div>
-          <span className={label}>Team members</span>
-          <div className="flex flex-wrap gap-2">
+      <Section title="Team" locked>
+        <Row name="Team members">
+          <span className="flex flex-wrap gap-2">
             {[CFG.email, ...CFG.teamEmails].map((e) => (
               <span
                 key={e}
-                className="rounded-full border border-line bg-field px-3 py-1.5 text-[13px] text-ink-soft"
+                className="rounded-full border border-line bg-field px-3 py-1 text-[13px] text-ink-soft"
               >
                 {e}
                 {e === CFG.email && <span className="text-muted"> (me)</span>}
               </span>
             ))}
-          </div>
-        </div>
-        <div>
-          <span className={label}>Count issues created since</span>
-          <input className={field} disabled value={CFG.teamFrom} />
-        </div>
+          </span>
+        </Row>
+        <Row name="Count issues created since">{CFG.teamFrom}</Row>
       </Section>
 
-      <Section title="Preferences">
-        <div>
-          <span className={label}>Auto-refresh interval</span>
-          <input className={field} disabled value={`${Math.round(CFG.refreshMs / 60000)} minutes`} />
-        </div>
+      <Section title="Preferences" locked>
+        <Row name="Auto-refresh interval">{`${Math.round(CFG.refreshMs / 60000)} minutes`}</Row>
+        <Row name="Mode">
+          {firebaseEnabled ? 'Team (Firebase connected)' : 'Individual (no Firebase env)'}
+        </Row>
       </Section>
-
-      <div className="flex justify-end">
-        <button
-          className={chip}
-          onClick={() => onNotify('Connection & team settings are read from .env (mock).')}
-        >
-          Save changes
-        </button>
-      </div>
     </div>
   )
 }

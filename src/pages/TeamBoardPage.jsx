@@ -200,6 +200,19 @@ export default function TeamBoardPage({ user, onNotify }) {
                           <span className="shrink-0 text-xs text-muted">
                             ENV {t.env}
                             {t.sprintStart ? ` · ${t.sprintStart}` : ''}
+                            {t.targetDate && (
+                              <span
+                                className={
+                                  t.status !== 'done' &&
+                                  t.targetDate < new Date().toISOString().slice(0, 10)
+                                    ? 'font-semibold text-danger'
+                                    : undefined
+                                }
+                              >
+                                {' · ⇥ '}
+                                {t.targetDate}
+                              </span>
+                            )}
                           </span>
                         </div>
                       </button>

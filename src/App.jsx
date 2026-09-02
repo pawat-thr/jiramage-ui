@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import Sidebar from './components/layout/Sidebar.jsx'
 import TopBar from './components/layout/TopBar.jsx'
 import Toast from './components/common/Toast.jsx'
@@ -41,14 +41,20 @@ const NAV_KEYS = Object.fromEntries(NAV_ITEMS.map((t) => [t.key, t.id]))
 const PAGE_TITLES = Object.fromEntries(NAV_ITEMS.map((t) => [t.id, t.label]))
 
 // Auth gate: when Firebase is configured, require a session before mounting
-// the shell (so no Jira fetches happen while signed out).
+// the shell (so no Jira fetches happen while signed out). /login is a real
+// route: signed-out users land there, signed-in users get bounced to home.
 export default function App() {
   const auth = useAuth()
+  const location = useLocation()
+  const atLogin = location.pathname === '/login'
+
+  if (auth.configured && !auth.ready) return <Spinner className="min-h-dvh" label="Loading…" />
 
   if (auth.configured && !auth.user) {
-    if (!auth.ready) return <Spinner className="min-h-dvh" label="Loading…" />
+    if (!atLogin) return <Navigate to="/login" replace />
     return <LoginPage auth={auth} />
   }
+  if (atLogin) return <Navigate to="/" replace />
   return <AppShell user={auth.user} onLogout={auth.configured ? auth.logout : null} />
 }
 

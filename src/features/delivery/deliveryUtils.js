@@ -14,15 +14,9 @@ export function roleOf(subtask) {
 
 const emptyRole = () => ({ total: 0, todo: 0, inprog: 0, done: 0, count: 0, doneCount: 0 })
 
-// The QA test-case DESIGN subtask, named exactly "[QA] Test case".
-export const isTestCase = (st) => /^\s*\[QA\]\s*test\s*case\s*$/i.test(st.fields?.summary || '')
-
-const emptyTc = () => ({ count: 0, doneCount: 0, inprogCount: 0, pts: 0, donePts: 0 })
-
 // Per-story delivery stats from its subtasks, split by role.
 export function deliveryStats(subtasks) {
   const roles = { FE: emptyRole(), BE: emptyRole(), QA: emptyRole() }
-  const tc = emptyTc()
   for (const st of subtasks || []) {
     const role = roleOf(st)
     if (!role) continue
@@ -39,28 +33,79 @@ export function deliveryStats(subtasks) {
     } else {
       r.todo += pts
     }
-    if (isTestCase(st)) {
-      tc.count++
-      tc.pts += pts
-      if (cat === 'done') {
-        tc.doneCount++
-        tc.donePts += pts
-      } else if (cat === 'indeterminate') {
-        tc.inprogCount++
-      }
-    }
   }
   const deliveryPoints = roles.FE.total + roles.BE.total + roles.QA.total
   const taggedCount = roles.FE.count + roles.BE.count + roles.QA.count
-  return { roles, deliveryPoints, taggedCount, tc }
+  return { roles, deliveryPoints, taggedCount }
 }
 
 export const fmtPts = (n) => (n % 1 ? n.toFixed(1) : String(n))
 
+// The QA subtask taxonomy (matched against the [QA] subtask summary).
+export const QA_CATEGORIES = [
+  { id: 'test_case', label: 'Test Case', re: /^\s*\[QA\]\s*test\s*case\s*$/i },
+  { id: 'test_review', label: 'Test Review', re: /review\s*test\s*case/i },
+  { id: 'data_sit', label: 'Test Data on SIT', re: /test\s*data\s*on\s*sit/i },
+  { id: 'exec_sit', label: 'Test Execute SIT', re: /test\s*execute\s*(on\s*)?sit/i },
+  { id: 'data_uat', label: 'Test Data on UAT & Regression', re: /test\s*data\s*on\s*uat/i },
+  { id: 'support_uat', label: 'Support UAT', re: /support\s*uat/i },
+  { id: 'support_reg', label: 'Support Regression', re: /support\s*regression/i },
+  { id: 'support_pvt', label: 'Support PVT', re: /support\s*pvt/i },
+  { id: 'review_task', label: 'Review Task', re: /review\s*task/i },
+]
+
+const emptyBucket = () => ({ count: 0, doneCount: 0, inprogCount: 0, pts: 0, donePts: 0 })
+
+const addToBucket = (b, pts, cat) => {
+  b.count++
+  b.pts += pts
+  if (cat === 'done') {
+    b.doneCount++
+    b.donePts += pts
+  } else if (cat === 'indeterminate') {
+    b.inprogCount++
+  }
+}
+
+// Per-story QA stats: overall total + one bucket per QA category.
+export function qaStats(subtasks) {
+  const total = emptyBucket()
+  const cats = Object.fromEntries(QA_CATEGORIES.map((c) => [c.id, emptyBucket()]))
+  for (const st of subtasks || []) {
+    if (roleOf(st) !== 'QA') continue
+    const pts = Number(st.fields?.[CFG.pointField]) || 0
+    const cat = st.fields?.status?.statusCategory?.key || 'new'
+    addToBucket(total, pts, cat)
+    const match = QA_CATEGORIES.find((c) => c.re.test(st.fields?.summary || ''))
+    if (match) addToBucket(cats[match.id], pts, cat)
+  }
+  return { total, cats }
+}
+
+// Release-wide QA rollup across all stories.
+export function qaRollup(stories, subMap) {
+  const merge = (dst, src) => {
+    dst.count += src.count
+    dst.doneCount += src.doneCount
+    dst.inprogCount += src.inprogCount
+    dst.pts += src.pts
+    dst.donePts += src.donePts
+  }
+  const agg = {
+    total: emptyBucket(),
+    cats: Object.fromEntries(QA_CATEGORIES.map((c) => [c.id, emptyBucket()])),
+  }
+  for (const s of stories) {
+    const st = qaStats(subMap?.[s.key])
+    merge(agg.total, st.total)
+    for (const c of QA_CATEGORIES) merge(agg.cats[c.id], st.cats[c.id])
+  }
+  return agg
+}
+
 // Whole-release rollup: per-role and overall points + story status counts.
 export function releaseRollup(stories, subMap) {
   const roles = { FE: emptyRole(), BE: emptyRole(), QA: emptyRole() }
-  const tc = emptyTc()
   let untagged = 0
   let storyDone = 0
   let storyInprog = 0
@@ -79,11 +124,6 @@ export function releaseRollup(stories, subMap) {
       dst.doneCount += src.doneCount
     }
     if (stats.taggedCount === 0) untagged++
-    tc.count += stats.tc.count
-    tc.doneCount += stats.tc.doneCount
-    tc.inprogCount += stats.tc.inprogCount
-    tc.pts += stats.tc.pts
-    tc.donePts += stats.tc.donePts
     const cat = s.fields.status.statusCategory?.key || 'new'
     if (cat === 'done') storyDone++
     else if (cat === 'indeterminate') storyInprog++
@@ -93,7 +133,6 @@ export function releaseRollup(stories, subMap) {
   const sum = (k) => roles.FE[k] + roles.BE[k] + roles.QA[k]
   return {
     roles,
-    tc,
     totalPts: sum('total'),
     donePts: sum('done'),
     inprogPts: sum('inprog'),

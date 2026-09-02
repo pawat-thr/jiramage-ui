@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import ModalShell from '../../components/common/ModalShell.jsx'
+import MemberPicker from '../../components/common/MemberPicker.jsx'
 import { CFG } from '../../config/appConfig.js'
-import { emailUsername } from '../../utils/format.js'
-import { cx } from '../../utils/ui.js'
 
 const label = 'block text-xs font-medium text-muted mb-1.5'
 const input =
@@ -128,23 +127,12 @@ export default function PrForm({ pr, onClose, onSubmit }) {
         </div>
         <div>
           <span className={label}>Reviewers (at least 1)</span>
-          <div className="flex flex-wrap gap-2">
-            {MEMBERS.map((email) => (
-              <button
-                type="button"
-                key={email}
-                onClick={() => toggleReviewer(email)}
-                className={cx(
-                  'rounded-full border px-3 py-1.5 text-[13px] transition-colors',
-                  reviewers.includes(email)
-                    ? 'border-accent bg-accent-soft text-accent-bright'
-                    : 'border-line bg-field text-ink-soft hover:border-line-strong',
-                )}
-              >
-                {emailUsername(email)}
-              </button>
-            ))}
-          </div>
+          <MemberPicker
+            members={MEMBERS}
+            selected={reviewers}
+            onToggle={toggleReviewer}
+            emptyHint="No reviewer yet — pick at least one below."
+          />
         </div>
         <div>
           <span className={label}>Detail</span>

@@ -80,7 +80,7 @@
 /* ---- DARK theme (explicit; JS resolves "system" to light/dark) ---- */
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --c-bg: #0d0e12;
+  --c-bg: #16181e;
   --c-panel: #191f29;
   --c-panel-soft: #202836;
   --c-field: #131923;
@@ -202,6 +202,14 @@
 @layer base {
   body {
     @apply min-w-80 min-h-dvh bg-bg font-body text-[15px] leading-normal text-ink;
+  }
+
+  /* Dark theme: soft gray→dark vertical gradient instead of flat near-black.
+     `fixed` keeps it stable while scrolling; --c-bg stays the midpoint so
+     translucent surfaces (top bar, table stripes) still blend in. */
+  :root[data-theme='dark'] body {
+    background:
+      linear-gradient(180deg, #21242c 0%, #16181e 45%, #101217 100%) fixed;
   }
 
   button {

@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { chip } from '../../utils/ui.js'
 
-export default function ModalShell({ title, subtitle, onClose, wide = false, children }) {
+export default function ModalShell({ title, subtitle, onClose, wide = false, hideFooter = false, children }) {
   useEffect(() => {
     const onKey = (e) => e.key === 'Escape' && onClose()
     window.addEventListener('keydown', onKey)
@@ -21,11 +21,13 @@ export default function ModalShell({ title, subtitle, onClose, wide = false, chi
         <h3 className="mb-1 text-base font-semibold">{title}</h3>
         <p className="mb-3.5 text-[13px] text-muted">{subtitle}</p>
         {children}
-        <div className="mt-3.5 flex justify-end gap-2">
-          <button className={chip} onClick={onClose}>
-            Cancel (Esc)
-          </button>
-        </div>
+        {!hideFooter && (
+          <div className="mt-3.5 flex justify-end gap-2">
+            <button className={chip} onClick={onClose}>
+              Cancel (Esc)
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )

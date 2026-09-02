@@ -59,7 +59,7 @@ export default defineConfig(({ mode }) => {
                   proxyReq.removeHeader(h)
                 }
               }
-              proxyReq.setHeader('User-Agent', 'jiramage-ui/0.1.5')
+              proxyReq.setHeader('User-Agent', 'jiramage-ui/0.1.6')
               proxyReq.setHeader('X-Atlassian-Token', 'no-check')
             })
           },

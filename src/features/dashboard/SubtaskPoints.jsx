@@ -3,6 +3,10 @@ import { card, emptyState } from '../../utils/ui.js'
 
 const fmtPts = (n) => (n % 1 ? n.toFixed(1) : String(n))
 
+// Workload heat: calm slate at 0 → full danger-red for the heaviest load.
+const heat = (ratio) =>
+  `color-mix(in oklab, var(--color-danger) ${Math.round(Math.min(1, ratio) * 100)}%, var(--color-slate))`
+
 // Per member: active subtasks + summed story points.
 export default function SubtaskPoints({ rows }) {
   const maxPoints = Math.max(1, ...rows.map((r) => r.points))
@@ -16,7 +20,8 @@ export default function SubtaskPoints({ rows }) {
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-5 py-3.5">
         <h2 className="text-sm font-semibold">Active subtasks · points</h2>
         <span className="text-xs text-muted">
-          {total.count} subtask{total.count === 1 ? '' : 's'} · {fmtPts(total.points)} pts total
+          {total.count} subtask{total.count === 1 ? '' : 's'} · {fmtPts(total.points)} pts total ·{' '}
+          <span className="text-danger">redder = heavier load</span>
         </span>
       </div>
 
@@ -43,13 +48,19 @@ export default function SubtaskPoints({ rows }) {
               </span>
               <span className="block h-2.5 rounded-[4px] bg-field">
                 <span
-                  className="block h-full rounded-[4px] bg-accent transition-[width] duration-500"
-                  style={{ width: `${(r.points / maxPoints) * 100}%` }}
+                  className="block h-full rounded-[4px] transition-[width] duration-500"
+                  style={{
+                    width: `${(r.points / maxPoints) * 100}%`,
+                    background: heat(r.points / maxPoints),
+                  }}
                 />
               </span>
               <span className="flex items-baseline gap-2 text-right">
                 <span className="text-xs text-muted tabular-nums">{r.count} task{r.count === 1 ? '' : 's'}</span>
-                <span className="w-12 text-sm font-semibold text-ink tabular-nums">
+                <span
+                  className="w-12 text-sm font-semibold tabular-nums"
+                  style={{ color: heat(r.points / maxPoints) }}
+                >
                   {fmtPts(r.points)} pts
                 </span>
               </span>

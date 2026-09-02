@@ -56,7 +56,7 @@ export default function ReleaseSummary({ release, rollup }) {
         </div>
       </div>
 
-      <div className="mt-4 grid gap-4 border-t border-line pt-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-4 grid gap-4 border-t border-line pt-4 sm:grid-cols-3">
         {ROLES.map(({ id, color }) => {
           const r = rollup.roles[id]
           const rp = r.total ? Math.round((r.done / r.total) * 100) : 0
@@ -78,29 +78,6 @@ export default function ReleaseSummary({ release, rollup }) {
             </div>
           )
         })}
-        <div>
-          <div className="flex items-baseline justify-between">
-            <span className="flex items-center gap-1.5 text-sm font-semibold text-coral">
-              <span className="size-2.5 rounded-full bg-coral" />
-              Test Case
-            </span>
-            <span className="text-sm font-semibold tabular-nums">
-              {rollup.tc.count ? Math.round((rollup.tc.doneCount / rollup.tc.count) * 100) : 0}%
-            </span>
-          </div>
-          <div className="mt-1.5">
-            <StackedBar
-              done={rollup.tc.doneCount}
-              inprog={rollup.tc.inprogCount}
-              todo={rollup.tc.count - rollup.tc.doneCount - rollup.tc.inprogCount}
-              total={rollup.tc.count}
-              h="h-2"
-            />
-          </div>
-          <p className="mt-1 text-xs text-muted tabular-nums">
-            {rollup.tc.doneCount}/{rollup.tc.count} designed · {fmtPts(rollup.tc.pts)} pts
-          </p>
-        </div>
       </div>
     </div>
   )

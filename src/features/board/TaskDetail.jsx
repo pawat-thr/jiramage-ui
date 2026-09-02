@@ -16,6 +16,8 @@ function Meta({ label, children }) {
 
 export default function TaskDetail({ task, user, onBack, onEdit, onDelete, onNotify }) {
   const isOwner = task.authorEmail === user.email
+  const overdue =
+    task.targetDate && task.status !== 'done' && task.targetDate < new Date().toISOString().slice(0, 10)
 
   const changeStatus = async (id) => {
     try {
@@ -68,6 +70,16 @@ export default function TaskDetail({ task, user, onBack, onEdit, onDelete, onNot
           </Meta>
           <Meta label="Env">ENV {task.env}</Meta>
           <Meta label="Sprint start">{task.sprintStart || '—'}</Meta>
+          <Meta label="Target date">
+            {task.targetDate ? (
+              <span className={overdue ? 'font-semibold text-danger' : undefined}>
+                {task.targetDate}
+                {overdue && ' · overdue'}
+              </span>
+            ) : (
+              '—'
+            )}
+          </Meta>
           <Meta label="Owner">{emailUsername(task.authorEmail || '')}</Meta>
           <Meta label="Users">
             {task.users?.length ? (

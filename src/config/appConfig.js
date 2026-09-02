@@ -3,6 +3,6 @@
 export const CFG = __APP_CONFIG__
 
 export const APP_NAME = 'jiramage'
-export const APP_VERSION = 'v0.1.5'
+export const APP_VERSION = 'v0.1.6'
 export const APP_CREDIT = 'by MpLab'
 export const APP_COPYRIGHT = `© ${new Date().getFullYear()} MpLab`
