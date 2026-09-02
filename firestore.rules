@@ -70,6 +70,22 @@ service cloud.firestore {
       }
     }
 
+    // In-app notification inbox (e.g. "assigned you to review a PR").
+    // Sender creates entries addressed to teammates; only the recipient can
+    // read them, flip the read flag, or delete them.
+    match /notifications/{notifId} {
+      allow read: if signedIn() && resource.data.toEmail == email();
+      allow create: if signedIn()
+        && request.resource.data.fromEmail == email()
+        && request.resource.data.toEmail != email()
+        && request.resource.data.read == false;
+      allow update: if signedIn()
+        && resource.data.toEmail == email()
+        && changed().hasOnly(['read'])
+        && request.resource.data.read == true;
+      allow delete: if signedIn() && resource.data.toEmail == email();
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

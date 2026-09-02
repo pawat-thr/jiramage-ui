@@ -1,4 +1,6 @@
 import { CFG, APP_VERSION, APP_CREDIT } from '../../config/appConfig.js'
+import { firebaseEnabled } from '../../services/firebase.js'
+import NotificationBell from './NotificationBell.jsx'
 
 function IconButton({ label, onClick, children, className = '' }) {
   return (
@@ -47,6 +49,7 @@ export default function TopBar({ title, updatedAt, user, onLogout, onToggleColla
           {updatedAt && <>updated {updatedAt.toLocaleTimeString()} · </>}
           auto-refresh {Math.round(CFG.refreshMs / 60000)}m
         </span>
+        {firebaseEnabled && user?.uid && <NotificationBell user={user} />}
         {user && (
           <span className="flex items-center gap-2 border-l border-line pl-3">
             <span className="max-w-[140px] truncate font-medium text-ink-soft" title={user.email}>

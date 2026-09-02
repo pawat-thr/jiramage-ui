@@ -8,6 +8,7 @@ import PrForm from '../features/pr/PrForm.jsx'
 import PrDetail from '../features/pr/PrDetail.jsx'
 import { PR_STATUSES, statusMeta, fmtTime } from '../features/pr/prConstants.js'
 import { watchPRs, createPR, updatePR, deletePR } from '../services/prApi.js'
+import { notifyReviewers } from '../services/notificationsApi.js'
 import { firebaseEnabled } from '../services/firebase.js'
 import { CFG } from '../config/appConfig.js'
 import { emailUsername, uniqueSorted } from '../utils/format.js'
@@ -55,14 +56,26 @@ export default function PrBoardPage({ user, onNotify }) {
   const statusOptions = PR_STATUSES.map((s) => s.label)
 
   const submitForm = async (data) => {
+    let prId
+    let newReviewers
     if (form?.pr) {
       await updatePR(form.pr.id, data)
+      prId = form.pr.id
+      // Only people added by this edit get an inbox entry — no re-notifying.
+      const before = form.pr.reviewers || []
+      newReviewers = (data.reviewers || []).filter((e) => !before.includes(e))
       onNotify('✓ PR updated')
     } else {
-      await createPR({ ...data, authorEmail: user.email, authorName: user.name })
+      const ref = await createPR({ ...data, authorEmail: user.email, authorName: user.name })
+      prId = ref.id
+      newReviewers = data.reviewers || []
       onNotify('✓ PR created')
     }
     setForm(null)
+    // Inbox entries are best-effort: a failure here must not undo the PR save.
+    notifyReviewers({ prId, prTitle: data.title, from: user, toEmails: newReviewers }).catch(
+      () => {},
+    )
   }
 
   const confirmDelete = async () => {

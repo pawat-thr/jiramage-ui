@@ -18,6 +18,7 @@ import {
   storyProgress,
   fmtPts,
 } from '../features/delivery/deliveryUtils.js'
+import { exportDeliveryXlsx } from '../features/delivery/exportXlsx.js'
 import { fetchSubtasksForParents, browseUrl } from '../services/jiraApi.js'
 import { uniqueSorted } from '../utils/format.js'
 import { card, cx, emptyState, searchInput, toolbar, th, td } from '../utils/ui.js'
@@ -101,6 +102,7 @@ export default function DeliveryPage({ stories, onRefresh, refreshing, defaultRe
   const [qaType, setQaType] = useState('')
   const [qaState, setQaState] = useState('')
   const [subMap, setSubMap] = useState(null) // parentKey -> subtasks[]
+  const [exporting, setExporting] = useState(false)
 
   // Detail view is URL-driven: /delivery/<KEY> (reuses the story detail).
   const location = useLocation()
@@ -243,6 +245,26 @@ export default function DeliveryPage({ stories, onRefresh, refreshing, defaultRe
           </>
         )}
         <RefreshButton refreshing={refreshing} onClick={onRefresh} />
+        {release && subMap && rows.length > 0 && (
+          <button
+            disabled={exporting}
+            onClick={async () => {
+              setExporting(true)
+              try {
+                await exportDeliveryXlsx({ release, rows, qaRows, subMap })
+                onNotify('✓ Exported .xlsx (Delivery + QA Info sheets)')
+              } catch (err) {
+                onNotify(err.message, true)
+              } finally {
+                setExporting(false)
+              }
+            }}
+            className="rounded-full border border-line bg-panel px-4 py-1.5 text-[13px] text-ink-soft transition-colors hover:border-accent hover:text-accent-bright disabled:cursor-wait disabled:opacity-60"
+            title="Download the current tables as an Excel file"
+          >
+            {exporting ? 'Exporting…' : '⇩ Export .xlsx'}
+          </button>
+        )}
         <span className="flex-1" />
         <span className="text-[13px] text-muted">
           {release
