@@ -142,7 +142,7 @@ export default function StoryDetail({ storyKey, onBack, hideBack = false, backLa
 
         <div className="mt-5 border-t border-line pt-4">
           <h3 className="mb-2 text-sm font-semibold">Description</h3>
-          <AdfContent doc={f.description} />
+          <AdfContent doc={f.description} attachments={f.attachment} />
         </div>
       </div>
 
@@ -198,7 +198,7 @@ export default function StoryDetail({ storyKey, onBack, hideBack = false, backLa
                     <span className="text-xs text-muted">{fmtDate(c.created)}</span>
                   </div>
                   <div className="mt-1 grid gap-1.5">
-                    <AdfContent doc={c.body} />
+                    <AdfContent doc={c.body} attachments={f.attachment} />
                   </div>
                 </div>
               </div>

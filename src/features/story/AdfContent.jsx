@@ -1,5 +1,47 @@
 // Minimal renderer for Atlassian Document Format (Jira v3 descriptions/comments).
 // Covers the common nodes; unknown nodes fall back to rendering their children.
+import { useEffect, useState } from 'react'
+
+// Full-size image viewer. Navigating to the attachment URL would DOWNLOAD it
+// (Jira sends Content-Disposition: attachment), so we show it in an overlay —
+// <img> ignores that header. Click anywhere or Esc to close.
+function ImageItem({ att, src }) {
+  const [open, setOpen] = useState(false)
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e) => e.key === 'Escape' && setOpen(false)
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open])
+
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)} title={`${att.filename} — click to view full size`}>
+        <img
+          src={src}
+          alt={att.filename}
+          loading="lazy"
+          className="max-h-80 max-w-full cursor-zoom-in rounded-xl border border-line"
+        />
+      </button>
+      {open && (
+        <div
+          role="dialog"
+          aria-label={att.filename}
+          className="zoom-normal fixed inset-0 z-50 grid animate-fade cursor-zoom-out place-items-center bg-backdrop p-6"
+          onClick={() => setOpen(false)}
+        >
+          <figure className="grid justify-items-center gap-2">
+            <img src={src} alt={att.filename} className="max-h-[85vh] max-w-[92vw] rounded-xl shadow-lift" />
+            <figcaption className="text-xs text-ink-soft">
+              {att.filename} · click or Esc to close
+            </figcaption>
+          </figure>
+        </div>
+      )}
+    </>
+  )
+}
 
 function TextNode({ node }) {
   let el = node.text
@@ -25,8 +67,44 @@ function TextNode({ node }) {
   return el
 }
 
-function Node({ node }) {
-  const kids = (node.content || []).map((n, i) => <Node key={i} node={n} />)
+// Inline media: the ADF node's `alt` is the attachment filename — match it to
+// the issue's attachment list and stream the bytes through the /jira proxy.
+function MediaItem({ node, atts }) {
+  const alt = node.attrs?.alt
+  const att = (atts || []).find((a) => a.filename === alt)
+  if (!att)
+    return (
+      <div className="rounded-xl border border-dashed border-line px-3 py-2 text-xs text-muted italic">
+        {alt || 'Attachment'} — open the card in Jira to view
+      </div>
+    )
+  const src = `/jira/rest/api/3/attachment/content/${att.id}`
+  const mime = att.mimeType || ''
+  if (mime.startsWith('image/')) return <ImageItem att={att} src={src} />
+  if (mime.startsWith('video/'))
+    return (
+      <video
+        src={src}
+        controls
+        preload="metadata"
+        title={att.filename}
+        className="max-h-80 max-w-full rounded-xl border border-line bg-black"
+      />
+    )
+  return (
+    <a
+      href={src}
+      target="_blank"
+      rel="noreferrer"
+      className="inline-flex items-center gap-1.5 rounded-xl border border-line bg-field px-3 py-1.5 text-[13px] text-ink-soft hover:border-accent hover:text-accent-bright"
+    >
+      📎 {att.filename}
+    </a>
+  )
+}
+
+function Node({ node, atts }) {
+  const kids = (node.content || []).map((n, i) => <Node key={i} node={n} atts={atts} />)
 
   switch (node.type) {
     case 'doc':
@@ -115,23 +193,20 @@ function Node({ node }) {
       )
     case 'mediaSingle':
     case 'mediaGroup':
+      return <div className="flex flex-wrap gap-2">{kids}</div>
     case 'media':
-      return (
-        <div className="rounded-xl border border-dashed border-line px-3 py-2 text-xs text-muted italic">
-          Attachment / image — open the card in Jira to view
-        </div>
-      )
+      return <MediaItem node={node} atts={atts} />
     default:
       return kids.length ? <>{kids}</> : null
   }
 }
 
-export default function AdfContent({ doc }) {
+export default function AdfContent({ doc, attachments }) {
   if (!doc) return <p className="text-sm text-muted italic">No description.</p>
   if (typeof doc === 'string') return <p className="text-sm whitespace-pre-wrap text-ink-soft">{doc}</p>
   return (
     <div className="grid gap-2">
-      <Node node={doc} />
+      <Node node={doc} atts={attachments} />
     </div>
   )
 }
