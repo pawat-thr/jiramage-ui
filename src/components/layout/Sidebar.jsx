@@ -21,12 +21,6 @@ const ICONS = {
       <circle cx="18" cy="18" r="2.5" />
     </>
   ),
-  story: (
-    <>
-      <path d="M4 5a2 2 0 0 1 2-2h9l5 5v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z" />
-      <path d="M14 3v5h5M8 13h8M8 17h5" />
-    </>
-  ),
   delivery: (
     <>
       <path d="M3 7h11v9H3zM14 10h4l3 3v3h-7z" />

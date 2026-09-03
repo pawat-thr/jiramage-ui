@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { CFG } from '../config/appConfig.js'
 import { card, cx } from '../utils/ui.js'
 import { useTheme } from '../hooks/useTheme.js'
@@ -8,6 +8,12 @@ import { changePassword } from '../services/firebaseAuth.js'
 import { validatePassword, PASSWORD_RULES } from '../utils/password.js'
 import { getNotifSound, setNotifSound } from '../utils/prefs.js'
 import { playPing } from '../utils/notifSound.js'
+import {
+  watchPromptTemplate,
+  savePromptTemplate,
+  linkParamCount,
+  DEFAULT_PROMPT_TEMPLATE,
+} from '../services/settingsApi.js'
 import PasswordField from '../components/common/PasswordField.jsx'
 
 const label = 'block text-xs font-medium text-muted mb-1.5'
@@ -141,6 +147,97 @@ function ChangePassword({ onNotify }) {
 
 const THEME_LABELS = { light: 'Light', dark: 'Dark', system: 'System' }
 
+// Team-shared dev prompt template. Must contain {link} exactly once — it gets
+// replaced by a card's Confluence spec URL when generating a prompt.
+function PromptTemplate({ onNotify }) {
+  const [saved, setSaved] = useState(DEFAULT_PROMPT_TEMPLATE)
+  const [draft, setDraft] = useState(null) // null = follow saved
+  const [busy, setBusy] = useState(false)
+  const areaRef = useRef(null)
+  useEffect(() => watchPromptTemplate(setSaved), [])
+
+  const value = draft ?? saved
+  const count = linkParamCount(value)
+  const valid = count === 1 && value.trim().length > 0
+  const dirty = draft !== null && draft !== saved
+
+  // Quick-insert {link} at the caret — only while the template doesn't have
+  // one yet (the rule is exactly 1, so the button disables after that).
+  const insertLink = () => {
+    const el = areaRef.current
+    const pos = el && document.activeElement === el ? el.selectionStart : value.length
+    const before = value.slice(0, pos)
+    const after = value.slice(pos)
+    const token =
+      (before && !/\s$/.test(before) ? ' ' : '') + '{link}' + (after && !/^\s/.test(after) ? ' ' : '')
+    setDraft(before + token + after)
+    const caret = (before + token).length
+    requestAnimationFrame(() => {
+      el?.focus()
+      el?.setSelectionRange(caret, caret)
+    })
+  }
+
+  const save = async () => {
+    setBusy(true)
+    try {
+      await savePromptTemplate(value.trim())
+      setDraft(null)
+      onNotify('✓ Prompt template saved for the whole team')
+    } catch (err) {
+      onNotify(err.message, true)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div>
+      <div className="mb-1.5 flex items-center justify-between gap-2">
+        <span className="text-xs font-medium text-muted">Template</span>
+        <button
+          type="button"
+          disabled={count >= 1}
+          // keep focus (and the caret) in the textarea so insert-at-cursor works
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={insertLink}
+          title={
+            count >= 1
+              ? '{link} is already in the template — exactly 1 is allowed'
+              : 'Insert {link} at the cursor'
+          }
+          className="rounded-full border border-line bg-field px-3 py-1 font-mono text-xs text-ink-soft transition-colors hover:border-accent hover:text-accent-bright disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          + {'{link}'}
+        </button>
+      </div>
+      <textarea
+        ref={areaRef}
+        className={`${editable} min-h-20 resize-y font-mono text-[13px]`}
+        value={value}
+        onChange={(e) => setDraft(e.target.value)}
+        placeholder={DEFAULT_PROMPT_TEMPLATE}
+      />
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+        <span className={`text-xs ${valid ? 'text-muted' : 'text-danger'}`}>
+          {count === 1
+            ? 'Contains {link} once — the card’s spec URL replaces it.'
+            : count === 0
+              ? 'Missing {link} — the template must contain it exactly once.'
+              : `{link} appears ${count} times — exactly 1 is required.`}
+        </span>
+        <button
+          disabled={!valid || !dirty || busy}
+          onClick={save}
+          className="rounded-full border border-accent bg-accent-soft px-5 py-2 text-sm font-semibold text-accent-bright transition-colors hover:bg-accent hover:text-bg disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {busy ? 'Saving…' : 'Save template'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function ZoneHeader({ title, hint }) {
   return (
     <div className="mt-2 first:mt-0">
@@ -218,6 +315,16 @@ export default function SettingsPage({ onNotify, user }) {
             </p>
           </div>
         )}
+      </Section>
+
+      <Section title="Dev Prompt">
+        <p className="-mt-1 text-xs text-muted">
+          {firebaseEnabled
+            ? 'Shared with the whole team — everyone generates prompts from this template.'
+            : 'Saved to this browser (no Firebase configured).'}{' '}
+          Use the ⚡ Prompt button on My Tasks / Team Task cards that have a Spec link.
+        </p>
+        <PromptTemplate onNotify={onNotify} />
       </Section>
 
       {firebaseEnabled && user && (

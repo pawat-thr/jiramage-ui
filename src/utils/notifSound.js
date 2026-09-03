@@ -5,27 +5,41 @@ import { getNotifSound } from './prefs.js'
 // queue ONE retry on the next click/keypress instead of dropping the ping.
 
 let ctx = null
+let comp = null // one shared compressor — created per ctx, never per ping
 let retryArmed = false
 
 const getCtx = () => (ctx ||= new (window.AudioContext || window.webkitAudioContext)())
 
+// Max loudness: full-scale peaks, tamed by a compressor so overlapping
+// notes can't clip into distortion.
+const getComp = (ac) => {
+  if (!comp) {
+    comp = ac.createDynamicsCompressor()
+    comp.threshold.value = -12
+    comp.ratio.value = 12
+    comp.connect(ac.destination)
+  }
+  return comp
+}
+
 function beep(ac, soft) {
   const t0 = ac.currentTime
-  const peak = soft ? 0.06 : 0.14
+  const peak = soft ? 0.45 : 1.0
+  const out = getComp(ac)
   const note = (freq, start, dur) => {
     const osc = ac.createOscillator()
     const gain = ac.createGain()
-    osc.type = 'sine'
+    osc.type = 'triangle' // richer harmonics than sine → cuts through better
     osc.frequency.value = freq
     gain.gain.setValueAtTime(0, t0 + start)
-    gain.gain.linearRampToValueAtTime(peak, t0 + start + 0.015)
+    gain.gain.linearRampToValueAtTime(peak, t0 + start + 0.012)
     gain.gain.exponentialRampToValueAtTime(0.0001, t0 + start + dur)
-    osc.connect(gain).connect(ac.destination)
+    osc.connect(gain).connect(out)
     osc.start(t0 + start)
     osc.stop(t0 + start + dur + 0.02)
   }
-  note(659, 0, 0.18) // E5
-  note(988, 0.09, 0.22) // B5
+  note(659, 0, 0.22) // E5
+  note(988, 0.1, 0.28) // B5
 }
 
 // soft=true → quieter tone (used for the periodic reminder).

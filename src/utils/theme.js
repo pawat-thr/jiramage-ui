@@ -9,7 +9,7 @@ export const getThemePref = () => localStorage.getItem(KEY) || 'system'
 const prefersDark = () =>
   window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
 
-export function applyTheme(pref = getThemePref()) {
+function applyTheme(pref = getThemePref()) {
   const dark = pref === 'dark' || (pref === 'system' && prefersDark())
   document.documentElement.dataset.theme = dark ? 'dark' : 'light'
 }

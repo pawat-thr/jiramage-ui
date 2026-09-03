@@ -6,7 +6,7 @@ import { cx } from '../../utils/ui.js'
 
 // Everyone who can be @mentioned: the whole team, addressed by email username
 // (e.g. @tanawat.k for tanawat.k@orbitdigital.co.th).
-export const MENTIONABLE = [CFG.email, ...CFG.teamEmails].map((email) => ({
+const MENTIONABLE = [CFG.email, ...CFG.teamEmails].map((email) => ({
   email,
   name: emailUsername(email),
 }))

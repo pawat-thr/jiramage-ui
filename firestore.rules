@@ -86,6 +86,12 @@ service cloud.firestore {
       allow delete: if signedIn() && resource.data.toEmail == email();
     }
 
+    // Team-wide app settings (e.g. the dev prompt template): every member can
+    // read them and update them — one shared configuration for the whole team.
+    match /settings/{docId} {
+      allow read, write: if signedIn();
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

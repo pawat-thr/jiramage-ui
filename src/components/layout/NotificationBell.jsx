@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { watchInbox, markRead, markAllRead } from '../../services/notificationsApi.js'
+import {
+  watchInbox,
+  markRead,
+  markAllRead,
+  pruneOldNotifications,
+} from '../../services/notificationsApi.js'
 import { NotifBody } from '../../features/inbox/notifText.jsx'
 import { APP_NAME, CFG } from '../../config/appConfig.js'
 import { playPing } from '../../utils/notifSound.js'
@@ -44,6 +49,8 @@ export default function NotificationBell({ user }) {
           // First snapshot after load/refresh: one ping if anything is unread
           // (browser may defer it to the first click — handled in playPing).
           if (unreadNow.length > 0) playPing()
+          // Retention: quietly clear read items older than 30 days.
+          pruneOldNotifications(list).catch(() => {})
         } else if (unreadNow.some((n) => !seenIds.current.has(n.id))) {
           // A brand-new notification arrived while the app is open.
           playPing()

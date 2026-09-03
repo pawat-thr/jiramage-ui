@@ -33,7 +33,7 @@ export function useJiraData(tab, onError) {
 
   useEffect(() => {
     if ((tab === 'team' || tab === 'dashboard') && teamIssues === null) loadTeam()
-    if ((tab === 'story' || tab === 'delivery') && storyIssues === null) loadStories()
+    if (tab === 'delivery' && storyIssues === null) loadStories()
   }, [tab, teamIssues, storyIssues, loadTeam, loadStories])
 
   useEffect(() => {
@@ -54,7 +54,7 @@ export function useJiraData(tab, onError) {
           ? [loadMy()]
           : tab === 'team'
             ? [loadTeam()]
-            : tab === 'story' || tab === 'delivery'
+            : tab === 'delivery'
               ? [loadStories()]
               : [loadMy(), loadTeam()]
       const results = await Promise.all(jobs)

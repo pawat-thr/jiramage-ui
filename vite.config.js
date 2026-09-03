@@ -4,7 +4,7 @@ import tailwindcss from '@tailwindcss/vite'
 import { execSync } from 'node:child_process'
 
 // Short git commit hash for the build code (Minecraft-snapshot style),
-// e.g. v0.1.7-beta.1+a3f9c2d. Falls back to "dev" outside a git checkout.
+// e.g. v0.1.7-beta.2+a3f9c2d. Falls back to "dev" outside a git checkout.
 function gitHash() {
   try {
     return execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] })
@@ -73,7 +73,7 @@ export default defineConfig(({ mode }) => {
                   proxyReq.removeHeader(h)
                 }
               }
-              proxyReq.setHeader('User-Agent', 'jiramage-ui/0.1.7-beta.1')
+              proxyReq.setHeader('User-Agent', 'jiramage-ui/0.1.7-beta.2')
               proxyReq.setHeader('X-Atlassian-Token', 'no-check')
             })
           },

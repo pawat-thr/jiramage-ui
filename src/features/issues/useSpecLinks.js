@@ -2,9 +2,40 @@ import { useEffect, useState } from 'react'
 import { fetchRemoteLinks, fetchDescriptionsForKeys } from '../../services/jiraApi.js'
 import { extractAdfLinks, bestSpecLink } from './specMatch.js'
 
-// parentKey -> [{url, title?}] — cached for the whole session so switching
-// between My Tasks and Team Task doesn't refetch.
+// parentKey -> [{url, title?}] — cached in memory for the session AND in
+// localStorage for 24h, so reloads don't redo one remote-link request per
+// parent story (the expensive part of spec matching).
+const CACHE_KEY = 'jiramage-spec-links-v1'
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000
+const CACHE_MAX_PARENTS = 400
+
 const parentLinksCache = new Map()
+
+function loadPersisted() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}')
+    const fresh = Date.now() - CACHE_TTL_MS
+    for (const [key, entry] of Object.entries(raw)) {
+      if (entry.at > fresh) parentLinksCache.set(key, entry.links)
+    }
+  } catch {
+    // corrupt cache → start clean
+  }
+}
+loadPersisted()
+
+function persist() {
+  try {
+    const entries = [...parentLinksCache.entries()].slice(-CACHE_MAX_PARENTS)
+    const at = Date.now()
+    localStorage.setItem(
+      CACHE_KEY,
+      JSON.stringify(Object.fromEntries(entries.map(([k, links]) => [k, { links, at }]))),
+    )
+  } catch {
+    // storage full/blocked — in-memory cache still works
+  }
+}
 
 async function linksForParents(keys) {
   const missing = keys.filter((k) => !parentLinksCache.has(k))
@@ -29,6 +60,7 @@ async function linksForParents(keys) {
         }),
       )
     }
+    persist()
   }
   return Object.fromEntries(keys.map((k) => [k, parentLinksCache.get(k) || []]))
 }

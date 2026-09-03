@@ -16,7 +16,7 @@ export const assigneeName = (issue) =>
 export const typeName = (iss) => iss.fields.issuetype?.name || 'Other'
 
 // Jira hierarchy level: 1 = Epic, 0 = Story/Task/Bug, -1 = Sub-task.
-export const typeTier = (iss) => iss.fields.issuetype?.hierarchyLevel ?? 0
+const typeTier = (iss) => iss.fields.issuetype?.hierarchyLevel ?? 0
 
 // Groups issues by work type, ordered Epic -> standard types -> Sub-task.
 export function groupByType(issues) {

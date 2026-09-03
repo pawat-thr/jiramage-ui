@@ -8,7 +8,6 @@ import ReassignModal from './features/issues/ReassignModal.jsx'
 import DashboardPage from './pages/DashboardPage.jsx'
 import MyTasksPage from './pages/MyTasksPage.jsx'
 import TeamPage from './pages/TeamPage.jsx'
-import StoryListPage from './pages/StoryListPage.jsx'
 import TeamBoardPage from './pages/TeamBoardPage.jsx'
 import DeliveryPage from './pages/DeliveryPage.jsx'
 import PrBoardPage from './pages/PrBoardPage.jsx'
@@ -28,7 +27,6 @@ const NAV_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', path: '/' },
   { id: 'my', label: 'My Tasks', path: '/my-tasks' },
   { id: 'team', label: 'Team Task', path: '/team-task' },
-  { id: 'story', label: 'Story List', path: '/story-list' },
   { id: 'delivery', label: 'Delivery Tracking (beta)', path: '/delivery' },
   ...(firebaseEnabled
     ? [
@@ -64,15 +62,17 @@ function AppShell({ user, onLogout }) {
   // The URL is the source of truth for the active page.
   const location = useLocation()
   const navigate = useNavigate()
-  // Prefix match so detail routes (/story-list/DX-123, /team-board/<id>, …)
+  // Prefix match so detail routes (/delivery/DX-123, /team-board/<id>, …)
   // keep their parent page active.
-  const tab = (
-    NAV_ITEMS.find(
-      (t) =>
-        t.path !== '/' &&
-        (location.pathname === t.path || location.pathname.startsWith(t.path + '/')),
-    ) || NAV_ITEMS[0]
-  ).id
+  const matched = NAV_ITEMS.find(
+    (t) =>
+      t.path !== '/' &&
+      (location.pathname === t.path || location.pathname.startsWith(t.path + '/')),
+  )
+  const tab = (matched || NAV_ITEMS[0]).id
+  // Unknown URLs (e.g. /inbox in individual mode, typos) → clean redirect home
+  // instead of showing the dashboard under a wrong address.
+  const unknownPath = !matched && location.pathname !== '/'
   const setTab = useCallback(
     (id) => {
       const item = NAV_ITEMS.find((t) => t.id === id)
@@ -94,7 +94,7 @@ function AppShell({ user, onLogout }) {
     if (await refresh()) showToast('✓ Refreshed — data is up to date')
   }
 
-  const { defaultRelease, setDefaultRelease } = usePrefs(user)
+  const { defaultRelease } = usePrefs(user)
 
   // Clear the Team member filter when navigating AWAY from Team Task, so the
   // page always opens fresh. (Dashboard→Team drill-through still works: it
@@ -121,6 +121,8 @@ function AppShell({ user, onLogout }) {
 
   const openTransition = (issue) => setModal({ kind: 'transition', issue })
   const openReassign = (issue) => setModal({ kind: 'reassign', issue })
+
+  if (unknownPath) return <Navigate to="/" replace />
 
   return (
     <div className="app-zoom flex min-h-dvh">
@@ -180,16 +182,6 @@ function AppShell({ user, onLogout }) {
               refreshing={refreshing}
               onTransition={openTransition}
               onReassign={openReassign}
-            />
-          )}
-          {tab === 'story' && (
-            <StoryListPage
-              stories={storyIssues}
-              onRefresh={handleRefresh}
-              refreshing={refreshing}
-              defaultRelease={defaultRelease}
-              onSetDefault={setDefaultRelease}
-              onNotify={showToast}
             />
           )}
           {tab === 'delivery' && (

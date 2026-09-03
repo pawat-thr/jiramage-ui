@@ -7,7 +7,7 @@ import StatusBadge from '../components/common/StatusBadge.jsx'
 import StoryDetail from '../features/story/StoryDetail.jsx'
 import ReleaseSummary from '../features/delivery/ReleaseSummary.jsx'
 import QASummary from '../features/delivery/QASummary.jsx'
-import { releaseNames } from '../features/story/StoryTable.jsx'
+import { releaseNames } from '../features/story/releaseNames.js'
 import {
   ROLES,
   QA_CATEGORIES,
@@ -174,8 +174,11 @@ export default function DeliveryPage({ stories, onRefresh, refreshing, defaultRe
     !b.count ? null : b.doneCount === b.count ? 'Done' : b.inprogCount > 0 ? 'In Progress' : 'To Do'
 
   // Search filter + sort least-complete stories first (done sinks to bottom).
+  // Capped to the same story set the subtask fetch/rollup covers, so the table
+  // never shows a story whose data was silently never loaded.
   const rows = useMemo(() => {
     return inRelease
+      .slice(0, MAX_STORIES)
       .filter((s) => {
         if (status && s.fields.status.name !== status) return false
         if (search && !`${s.key} ${s.fields.summary}`.toLowerCase().includes(search.toLowerCase()))

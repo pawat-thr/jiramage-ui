@@ -3,7 +3,7 @@ import { emailUsername } from '../../utils/format.js'
 
 // Human-readable message for one notification, shared by the bell dropdown
 // and the Inbox page.
-export function notifMessage(n) {
+function notifMessage(n) {
   switch (n.type) {
     case 'pr_status_changed':
       return (

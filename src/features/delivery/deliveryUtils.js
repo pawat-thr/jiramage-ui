@@ -7,7 +7,7 @@ export const ROLES = [
   { id: 'QA', color: 'var(--color-amber)' },
 ]
 
-export function roleOf(subtask) {
+function roleOf(subtask) {
   const m = /\[(FE|BE|QA)\]/i.exec(subtask.fields?.summary || '')
   return m ? m[1].toUpperCase() : null
 }

@@ -1,5 +1,8 @@
+import { useEffect, useState } from 'react'
 import StatusBadge from '../../components/common/StatusBadge.jsx'
+import PromptModal from './PromptModal.jsx'
 import { browseUrl } from '../../services/jiraApi.js'
+import { watchPromptTemplate, DEFAULT_PROMPT_TEMPLATE } from '../../services/settingsApi.js'
 import { shortName, groupByType } from '../../utils/format.js'
 import { typeColor } from '../../utils/typeColors.js'
 import { card, emptyState, miniBtn, th, td } from '../../utils/ui.js'
@@ -31,6 +34,12 @@ const PRIORITY_CLASSES = {
 }
 
 export default function IssueTable({ issues, showAssignee, onTransition, onReassign, specLinks = {} }) {
+  // Default template as fallback: if the Firestore watch fails (e.g. rules not
+  // republished yet) the ⚡ Prompt popup still generates a usable prompt.
+  const [template, setTemplate] = useState(DEFAULT_PROMPT_TEMPLATE)
+  const [promptUrl, setPromptUrl] = useState(null) // spec url for the open popup
+  useEffect(() => watchPromptTemplate(setTemplate), [])
+
   if (!issues.length) {
     return (
       <div className={card}>
@@ -122,6 +131,15 @@ export default function IssueTable({ issues, showAssignee, onTransition, onReass
                         <span aria-hidden className="text-[10px] opacity-70">↗</span>
                       </a>
                     )}
+                    {specLinks[iss.key] && (
+                      <button
+                        className="inline-flex shrink-0 items-center gap-1 rounded-full border border-violet/40 bg-violet-soft px-2 py-[2px] text-[11px] font-medium text-violet transition-colors hover:border-violet hover:bg-violet hover:text-bg"
+                        onClick={() => setPromptUrl(specLinks[iss.key].url)}
+                        title="Generate a dev prompt from the team template with this spec link"
+                      >
+                        ⚡ Prompt
+                      </button>
+                    )}
                   </div>
                 )}
               </td>
@@ -157,6 +175,9 @@ export default function IssueTable({ issues, showAssignee, onTransition, onReass
           </tbody>
         ))}
       </table>
+      {promptUrl && (
+        <PromptModal template={template} url={promptUrl} onClose={() => setPromptUrl(null)} />
+      )}
     </div>
   )
 }

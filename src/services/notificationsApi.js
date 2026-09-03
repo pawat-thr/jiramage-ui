@@ -32,6 +32,24 @@ export const markRead = (id) => updateDoc(notifDoc(id), { read: true })
 
 export const deleteNotification = (id) => deleteDoc(notifDoc(id))
 
+// Retention sweep: the inbox collection would otherwise grow forever. Once per
+// session, silently delete the user's READ notifications older than `days`.
+// (Rules only let the recipient delete their own, which is exactly the set
+// watchInbox returns.)
+export const PRUNE_AFTER_DAYS = 30
+let pruned = false
+
+export function pruneOldNotifications(items, days = PRUNE_AFTER_DAYS) {
+  if (pruned) return Promise.resolve(0)
+  pruned = true
+  const cutoff = Date.now() / 1000 - days * 86400
+  const old = (items || []).filter((n) => n.read && (n.createdAt?.seconds || Infinity) < cutoff)
+  if (!old.length) return Promise.resolve(0)
+  const batch = writeBatch(db)
+  for (const n of old.slice(0, 400)) batch.delete(notifDoc(n.id))
+  return batch.commit().then(() => old.length)
+}
+
 export function markAllRead(ids) {
   const batch = writeBatch(db)
   for (const id of ids) batch.update(notifDoc(id), { read: true })

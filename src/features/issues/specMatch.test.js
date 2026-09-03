@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { extractAdfLinks, titleFromUrl, bestSpecUrl } from './specMatch.js'
+import { extractAdfLinks, titleFromUrl, bestSpecLink } from './specMatch.js'
+
+const bestSpecUrl = (summary, links) => bestSpecLink(summary, links)?.url ?? null
 
 const SPEC_URL =
   'https://orbitdigital.atlassian.net/wiki/spaces/Merchant/pages/2113568967/R6.1+5+S12+POST+campaigns+v1+mp-merchant+pre-order+orders+get-order-detail?xpis=abc'

@@ -32,7 +32,7 @@ const isConfluence = (url) => /\/wiki\//.test(url || '')
 // Lowercase alphanumeric tokens; "[BE][MP]" prefixes are dropped by the caller.
 // CamelCase splits into words ("ValidatePreOrderCart" → validate pre order cart)
 // so GRPC-style names compare the same as slash-style endpoint paths.
-export const tokenize = (s) =>
+const tokenize = (s) =>
   (s || '')
     .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
     .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
@@ -78,4 +78,3 @@ export function bestSpecLink(summary, links) {
   return best
 }
 
-export const bestSpecUrl = (summary, links) => bestSpecLink(summary, links)?.url ?? null

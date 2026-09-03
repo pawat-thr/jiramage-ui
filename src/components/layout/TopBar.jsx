@@ -35,7 +35,7 @@ export default function TopBar({ title, updatedAt, user, onLogout, onToggleColla
       <div className="min-w-0 flex-1">
         <h1 className="truncate text-lg font-semibold">{title}</h1>
         <span className="block text-xs text-muted max-md:hidden">
-          Jira dashboard · {APP_VERSION} · {APP_CREDIT}
+          Internal Team Dashboard · {APP_VERSION} · {APP_CREDIT}
         </span>
       </div>
 

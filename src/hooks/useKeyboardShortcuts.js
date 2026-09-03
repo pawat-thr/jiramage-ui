@@ -7,6 +7,9 @@ export function useKeyboardShortcuts({ enabled, tabKeys, onTab, onToggleHide }) 
     const onKey = (e) => {
       if (!enabled || e.metaKey || e.ctrlKey || e.altKey) return
       if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return
+      // Any open dialog (ModalShell renders role="dialog") suppresses nav keys —
+      // covers modals whose state lives outside AppShell (e.g. PromptModal).
+      if (document.querySelector('[role="dialog"]')) return
       if (tabKeys[e.key]) onTab(tabKeys[e.key])
       if (e.key === 'h') onToggleHide()
     }
