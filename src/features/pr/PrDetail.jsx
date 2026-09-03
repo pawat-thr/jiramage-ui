@@ -3,6 +3,7 @@ import PrStatusBadge from './PrStatusBadge.jsx'
 import { PR_STATUSES, statusMeta, fmtTime, avatarColor, initials } from './prConstants.js'
 import { watchComments, addComment, setStatus } from '../../services/prApi.js'
 import { sendNotifications } from '../../services/notificationsApi.js'
+import { MentionTextarea, MentionText, extractMentionEmails } from './mentions.jsx'
 import { emailUsername } from '../../utils/format.js'
 import { cx, card } from '../../utils/ui.js'
 
@@ -58,23 +59,35 @@ export default function PrDetail({ pr, user, onBack, onEdit, onDelete, onNotify 
 
   const postComment = async (e) => {
     e.preventDefault()
-    if (!body.trim()) return
+    const text = body.trim()
+    if (!text) return
     setPosting(true)
     try {
       await addComment(pr.id, {
         authorEmail: user.email,
         authorName: user.name,
-        body: body.trim(),
+        body: text,
       })
       setBody('')
-      // Tell the PR owner someone commented on their post (self filtered out).
+      // @mentioned members get a mention notification; the PR owner gets the
+      // plain "commented" one unless they were mentioned (no double-notify).
+      const mentioned = extractMentionEmails(text)
       sendNotifications({
-        type: 'pr_comment',
-        toEmails: [pr.authorEmail],
+        type: 'pr_mention',
+        toEmails: mentioned,
         from: user,
         refId: pr.id,
         title: pr.title,
-      }).catch((err) => console.warn('[notify] comment inbox write failed:', err.message))
+      }).catch((err) => console.warn('[notify] mention inbox write failed:', err.message))
+      if (!mentioned.includes(pr.authorEmail)) {
+        sendNotifications({
+          type: 'pr_comment',
+          toEmails: [pr.authorEmail],
+          from: user,
+          refId: pr.id,
+          title: pr.title,
+        }).catch((err) => console.warn('[notify] comment inbox write failed:', err.message))
+      }
     } catch (err) {
       onNotify(err.message, true)
     } finally {
@@ -182,7 +195,9 @@ export default function PrDetail({ pr, user, onBack, onEdit, onDelete, onNotify 
         </div>
       </div>
 
-      <div className={`${card} p-5`}>
+      {/* overflow-visible!: the @mention dropdown opens above the textarea and
+          must not be clipped by the card when there are few comments */}
+      <div className={`${card} overflow-visible! p-5`}>
         <h3 className="text-sm font-semibold">
           Comments <span className="text-muted">({comments.length})</span>
         </h3>
@@ -205,7 +220,9 @@ export default function PrDetail({ pr, user, onBack, onEdit, onDelete, onNotify 
                     <span className="text-[13px] font-semibold text-ink">{who}</span>
                     <span className="text-xs text-muted">{fmtTime(c.createdAt)}</span>
                   </div>
-                  <p className="mt-1 text-sm whitespace-pre-wrap text-ink-soft">{c.body}</p>
+                  <p className="mt-1 text-sm whitespace-pre-wrap text-ink-soft">
+                    <MentionText text={c.body} />
+                  </p>
                 </div>
               </div>
             )
@@ -220,17 +237,15 @@ export default function PrDetail({ pr, user, onBack, onEdit, onDelete, onNotify 
             {initials(user.name)}
           </span>
           <div className="min-w-0 flex-1">
-            <textarea
+            <MentionTextarea
               className="min-h-20 w-full resize-y rounded-2xl border border-line bg-field px-3.5 py-2.5 text-sm text-ink transition-colors placeholder:text-muted focus:border-accent"
-              placeholder="Write a comment…"
+              placeholder="Write a comment… type @ to mention a teammate"
               value={body}
-              onChange={(e) => setBody(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) postComment(e)
-              }}
+              setValue={setBody}
+              onPost={postComment}
             />
             <div className="mt-2 flex items-center justify-between">
-              <span className="text-xs text-muted">⌘/Ctrl + Enter to post</span>
+              <span className="text-xs text-muted">@ to mention · ⌘/Ctrl + Enter to post</span>
               <button
                 type="submit"
                 disabled={posting || !body.trim()}

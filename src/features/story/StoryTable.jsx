@@ -23,8 +23,10 @@ export default function StoryTable({ stories, onOpen }) {
   }
 
   return (
-    <div className={card}>
-      <table className="w-full border-collapse">
+    // overflow-x-auto: on narrow screens the table scrolls sideways instead of
+    // clipping the Status column.
+    <div className={`${card} overflow-x-auto`}>
+      <table className="w-full min-w-[560px] border-collapse">
         <thead>
           <tr>
             <th className={th}>Key</th>

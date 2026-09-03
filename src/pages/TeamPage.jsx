@@ -3,6 +3,7 @@ import FilterMenu from '../components/common/FilterMenu.jsx'
 import RefreshButton from '../components/common/RefreshButton.jsx'
 import Spinner from '../components/common/Spinner.jsx'
 import IssueTable from '../features/issues/IssueTable.jsx'
+import { useSpecLinks } from '../features/issues/useSpecLinks.js'
 import { filterIssues, uniqueSorted, assigneeName, typeName } from '../utils/format.js'
 import { cx, chip, chipOn, searchInput, toolbar } from '../utils/ui.js'
 
@@ -31,6 +32,7 @@ export default function TeamPage({
   )
   const nameOptions = useMemo(() => uniqueSorted((issues || []).map(assigneeName)), [issues])
   const typeOptions = useMemo(() => uniqueSorted((issues || []).map(typeName)), [issues])
+  const specLinks = useSpecLinks(visible)
 
   return (
     <>
@@ -60,6 +62,7 @@ export default function TeamPage({
         <IssueTable
           issues={visible}
           showAssignee
+          specLinks={specLinks}
           onTransition={onTransition}
           onReassign={onReassign}
         />

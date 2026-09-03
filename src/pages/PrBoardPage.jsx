@@ -16,6 +16,28 @@ import { card, chip, cx, toolbar, emptyState } from '../utils/ui.js'
 
 const MEMBERS = [CFG.email, ...CFG.teamEmails]
 
+function PrCard({ pr, onOpen }) {
+  return (
+    <button
+      onClick={onOpen}
+      style={{ borderLeftColor: statusMeta(pr.status).color, borderLeftWidth: '4px' }}
+      className={`${card} p-4 pl-5 text-left transition-all hover:-translate-y-0.5 hover:border-accent`}
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="truncate font-semibold text-ink">{pr.title}</h3>
+          <p className="mt-0.5 text-xs text-muted">
+            by {emailUsername(pr.authorEmail || '')} · {(pr.reviewers || []).length} reviewer
+            {(pr.reviewers || []).length === 1 ? '' : 's'} · updated {fmtTime(pr.updatedAt)}
+          </p>
+        </div>
+        <PrStatusBadge status={pr.status} />
+      </div>
+      {pr.detail && <p className="mt-2 line-clamp-2 text-[13px] text-ink-soft">{pr.detail}</p>}
+    </button>
+  )
+}
+
 export default function PrBoardPage({ user, onNotify }) {
   const [prs, setPrs] = useState(null)
   // Detail view is URL-driven: /pr-review/<id>
@@ -96,6 +118,19 @@ export default function PrBoardPage({ user, onNotify }) {
     }
   }
 
+  // PRs waiting on ME: I'm a reviewer and it isn't approved/merged yet.
+  // Independent of the filters below — it's an attention list.
+  const needsMyReview = useMemo(
+    () =>
+      (prs || []).filter(
+        (pr) =>
+          (pr.reviewers || []).includes(user.email) &&
+          pr.status !== 'approved' &&
+          pr.status !== 'merged',
+      ),
+    [prs, user.email],
+  )
+
   const selected = selectedId ? (prs || []).find((p) => p.id === selectedId) : null
 
   // If the open PR disappears (deleted elsewhere), fall back to the board.
@@ -142,37 +177,42 @@ export default function PrBoardPage({ user, onNotify }) {
 
           {prs === null ? (
             <Spinner label="Loading PRs…" />
-          ) : !visible.length ? (
-            <div className={card}>
-              <div className={emptyState}>
-                {prs.length ? 'No PRs match the filters.' : 'No PRs yet — create the first one.'}
-              </div>
-            </div>
           ) : (
-            <div className="grid gap-3">
-              {visible.map((pr) => (
-                <button
-                  key={pr.id}
-                  onClick={() => navigate(`/pr-review/${pr.id}`)}
-                  style={{ borderLeftColor: statusMeta(pr.status).color, borderLeftWidth: '4px' }}
-                  className={`${card} p-4 pl-5 text-left transition-all hover:-translate-y-0.5 hover:border-accent`}
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <h3 className="truncate font-semibold text-ink">{pr.title}</h3>
-                      <p className="mt-0.5 text-xs text-muted">
-                        by {emailUsername(pr.authorEmail || '')} · {(pr.reviewers || []).length}{' '}
-                        reviewer{(pr.reviewers || []).length === 1 ? '' : 's'} · updated{' '}
-                        {fmtTime(pr.updatedAt)}
-                      </p>
-                    </div>
-                    <PrStatusBadge status={pr.status} />
+            <div className="grid gap-4">
+              {needsMyReview.length > 0 && (
+                <section>
+                  <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink">
+                    <span className="grid size-5 place-items-center rounded-full bg-accent text-[11px] font-bold text-white">
+                      {needsMyReview.length}
+                    </span>
+                    Waiting for your review
+                  </h2>
+                  <div className="grid gap-3">
+                    {needsMyReview.map((pr) => (
+                      <PrCard key={pr.id} pr={pr} onOpen={() => navigate(`/pr-review/${pr.id}`)} />
+                    ))}
                   </div>
-                  {pr.detail && (
-                    <p className="mt-2 line-clamp-2 text-[13px] text-ink-soft">{pr.detail}</p>
-                  )}
-                </button>
-              ))}
+                </section>
+              )}
+
+              <section>
+                {needsMyReview.length > 0 && (
+                  <h2 className="mb-3 text-sm font-semibold text-muted">All PRs</h2>
+                )}
+                {!visible.length ? (
+                  <div className={card}>
+                    <div className={emptyState}>
+                      {prs.length ? 'No PRs match the filters.' : 'No PRs yet — create the first one.'}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid gap-3">
+                    {visible.map((pr) => (
+                      <PrCard key={pr.id} pr={pr} onOpen={() => navigate(`/pr-review/${pr.id}`)} />
+                    ))}
+                  </div>
+                )}
+              </section>
             </div>
           )}
         </div>

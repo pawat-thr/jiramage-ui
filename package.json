@@ -1,7 +1,7 @@
 {
   "name": "jiramage-ui",
   "private": true,
-  "version": "0.1.6",
+  "version": "0.1.7-beta.1",
   "type": "module",
   "scripts": {
     "dev": "vite",

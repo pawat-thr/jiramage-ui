@@ -3,6 +3,7 @@ import FilterMenu from '../components/common/FilterMenu.jsx'
 import RefreshButton from '../components/common/RefreshButton.jsx'
 import Spinner from '../components/common/Spinner.jsx'
 import IssueTable from '../features/issues/IssueTable.jsx'
+import { useSpecLinks } from '../features/issues/useSpecLinks.js'
 import { filterIssues, uniqueSorted, typeName } from '../utils/format.js'
 import { cx, chip, chipOn, searchInput, toolbar } from '../utils/ui.js'
 
@@ -20,6 +21,7 @@ export default function MyTasksPage({ issues, hideDone, onToggleHide, onRefresh,
     [issues],
   )
   const typeOptions = useMemo(() => uniqueSorted((issues || []).map(typeName)), [issues])
+  const specLinks = useSpecLinks(visible)
 
   return (
     <>
@@ -48,6 +50,7 @@ export default function MyTasksPage({ issues, hideDone, onToggleHide, onRefresh,
         <IssueTable
           issues={visible}
           showAssignee={false}
+          specLinks={specLinks}
           onTransition={onTransition}
           onReassign={onReassign}
         />

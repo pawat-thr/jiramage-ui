@@ -161,3 +161,18 @@ export function doTransition(issueKey, transitionId) {
 }
 
 export const browseUrl = (key) => `${CFG.jiraUrl}/browse/${key}`
+
+// Remote links on an issue (e.g. Confluence pages "mentioned on" the story).
+export function fetchRemoteLinks(key) {
+  return jira(`/rest/api/3/issue/${key}/remotelink`)
+}
+
+// Bulk-fetch descriptions for a set of issue keys (for spec-link extraction).
+export async function fetchDescriptionsForKeys(keys) {
+  const out = []
+  for (let i = 0; i < keys.length; i += 50) {
+    const chunk = keys.slice(i, i + 50)
+    out.push(...(await searchAll(`key in (${quote(chunk)})`, ['description'])))
+  }
+  return out
+}

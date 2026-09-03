@@ -1,6 +1,19 @@
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import { execSync } from 'node:child_process'
+
+// Short git commit hash for the build code (Minecraft-snapshot style),
+// e.g. v0.1.7-beta.1+a3f9c2d. Falls back to "dev" outside a git checkout.
+function gitHash() {
+  try {
+    return execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] })
+      .toString()
+      .trim()
+  } catch {
+    return 'dev'
+  }
+}
 
 // Parses Go-style durations like "5m", "30s", "1h" into milliseconds.
 function parseInterval(raw) {
@@ -24,6 +37,7 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react(), tailwindcss()],
     define: {
+      __BUILD_HASH__: JSON.stringify(gitHash()),
       // Non-secret config only — the token stays inside the dev-server proxy.
       __APP_CONFIG__: JSON.stringify({
         jiraUrl: env.JIRA_URL || '',
@@ -59,7 +73,7 @@ export default defineConfig(({ mode }) => {
                   proxyReq.removeHeader(h)
                 }
               }
-              proxyReq.setHeader('User-Agent', 'jiramage-ui/0.1.6')
+              proxyReq.setHeader('User-Agent', 'jiramage-ui/0.1.7-beta.1')
               proxyReq.setHeader('X-Atlassian-Token', 'no-check')
             })
           },

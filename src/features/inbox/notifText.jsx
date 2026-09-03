@@ -13,6 +13,8 @@ export function notifMessage(n) {
       )
     case 'pr_comment':
       return 'commented on your PR'
+    case 'pr_mention':
+      return 'mentioned you in a comment on'
     default:
       return 'assigned you to review'
   }

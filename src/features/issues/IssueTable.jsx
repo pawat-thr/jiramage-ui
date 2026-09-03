@@ -4,6 +4,24 @@ import { shortName, groupByType } from '../../utils/format.js'
 import { typeColor } from '../../utils/typeColors.js'
 import { card, emptyState, miniBtn, th, td } from '../../utils/ui.js'
 
+function SpecIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="size-3"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M5 4a2 2 0 0 1 2-2h7l5 5v13a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2z" />
+      <path d="M13 2v6h6M9 13h6M9 17h4" />
+    </svg>
+  )
+}
+
 const PRIORITY_CLASSES = {
   Highest: 'text-coral font-medium',
   High: 'text-coral',
@@ -12,7 +30,7 @@ const PRIORITY_CLASSES = {
   Lowest: 'text-blue',
 }
 
-export default function IssueTable({ issues, showAssignee, onTransition, onReassign }) {
+export default function IssueTable({ issues, showAssignee, onTransition, onReassign, specLinks = {} }) {
   if (!issues.length) {
     return (
       <div className={card}>
@@ -24,8 +42,10 @@ export default function IssueTable({ issues, showAssignee, onTransition, onReass
   const groups = groupByType(issues)
 
   return (
-    <div className={card}>
-      <table className="w-full border-collapse">
+    // overflow-x-auto: on narrow screens the table scrolls sideways instead of
+    // clipping the Status/Priority/actions columns.
+    <div className={`${card} overflow-x-auto`}>
+      <table className="w-full min-w-[640px] border-collapse">
         <thead>
           <tr>
             <th className={th}>Key</th>
@@ -89,6 +109,19 @@ export default function IssueTable({ issues, showAssignee, onTransition, onReass
                     <span className="truncate" title={iss.fields.parent.fields?.summary}>
                       {iss.fields.parent.fields?.summary}
                     </span>
+                    {specLinks[iss.key] && (
+                      <a
+                        className="inline-flex shrink-0 items-center gap-1 rounded-full border border-blue/40 bg-blue-soft px-2 py-[2px] text-[11px] font-medium text-blue transition-colors hover:border-blue hover:bg-blue hover:text-bg"
+                        href={specLinks[iss.key].url}
+                        target="_blank"
+                        rel="noreferrer"
+                        title={`Spec: ${specLinks[iss.key].title}`}
+                      >
+                        <SpecIcon />
+                        Spec
+                        <span aria-hidden className="text-[10px] opacity-70">↗</span>
+                      </a>
+                    )}
                   </div>
                 )}
               </td>
@@ -109,7 +142,8 @@ export default function IssueTable({ issues, showAssignee, onTransition, onReass
                 )}
               </td>
               <td className={td}>
-                <div className="flex justify-end gap-1.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                {/* hover-reveal on desktop; always visible on touch screens */}
+                <div className="flex justify-end gap-1.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 max-md:opacity-100">
                   <button className={miniBtn} onClick={() => onTransition(iss)}>
                     move
                   </button>
