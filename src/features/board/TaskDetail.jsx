@@ -2,7 +2,7 @@ import { TASK_STATUSES, taskStatusMeta } from './boardConstants.jsx'
 import StoryDetail from '../story/StoryDetail.jsx'
 import { setTaskStatus } from '../../services/teamBoardApi.js'
 import { avatarColor, initials, fmtTime } from '../pr/prConstants.js'
-import { emailUsername } from '../../utils/format.js'
+import { emailUsername, todayLocalISO } from '../../utils/format.js'
 import { cx, card } from '../../utils/ui.js'
 
 function Meta({ label, children }) {
@@ -17,9 +17,10 @@ function Meta({ label, children }) {
 export default function TaskDetail({ task, user, onBack, onEdit, onDelete, onNotify }) {
   const isOwner = task.authorEmail === user.email
   const overdue =
-    task.targetDate && task.status !== 'done' && task.targetDate < new Date().toISOString().slice(0, 10)
+    task.targetDate && task.status !== 'done' && task.targetDate < todayLocalISO()
 
   const changeStatus = async (id) => {
+    if (id === task.status) return
     try {
       await setTaskStatus(task.id, id)
     } catch (err) {

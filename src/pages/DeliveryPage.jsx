@@ -293,7 +293,7 @@ export default function DeliveryPage({ stories, onRefresh, refreshing, defaultRe
             </p>
           )}
 
-          {!rows.length ? (
+          {!(view === 'qa' ? qaRows : rows).length ? (
             <div className={card}>
               <div className={emptyState}>No stories in this release match.</div>
             </div>

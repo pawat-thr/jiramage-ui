@@ -6,9 +6,7 @@ import {
   markAllRead,
   deleteNotification,
 } from '../services/notificationsApi.js'
-import { notifMessage } from '../features/inbox/notifText.jsx'
-import { avatarColor, initials, fmtTime } from '../features/pr/prConstants.js'
-import { emailUsername } from '../utils/format.js'
+import { NotifBody } from '../features/inbox/notifText.jsx'
 import { card, cx, emptyState, toolbar } from '../utils/ui.js'
 
 const TABS = [
@@ -87,21 +85,7 @@ export default function InboxPage({ user, onNotify }) {
                 !n.read && 'bg-accent-soft/40',
               )}
             >
-              <span
-                className="mt-0.5 grid size-10 shrink-0 place-items-center rounded-full text-[13px] font-bold text-bg"
-                style={{ background: avatarColor(n.fromEmail) }}
-              >
-                {initials(n.fromName || emailUsername(n.fromEmail))}
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm text-ink">
-                  <strong>{n.fromName || emailUsername(n.fromEmail)}</strong> {notifMessage(n)}
-                </span>
-                <span className="block truncate text-sm font-medium text-accent-bright">
-                  {n.title}
-                </span>
-                <span className="mt-0.5 block text-xs text-muted">{fmtTime(n.createdAt)}</span>
-              </span>
+              <NotifBody n={n} />
               {!n.read && <span className="mt-2 size-2.5 shrink-0 rounded-full bg-accent" />}
               <button
                 aria-label="Delete notification"

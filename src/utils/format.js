@@ -43,3 +43,11 @@ export function filterIssues(issues, { hideDone, status, name, search, type } = 
     return true
   })
 }
+
+// Today's date as YYYY-MM-DD in the user's LOCAL timezone.
+// (toISOString() is UTC — in UTC+7 it lags the local date until 07:00.)
+export function todayLocalISO() {
+  const d = new Date()
+  const p = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+}

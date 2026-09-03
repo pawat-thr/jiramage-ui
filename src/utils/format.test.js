@@ -100,3 +100,17 @@ describe('filterIssues', () => {
     expect(filterIssues(null, {})).toEqual([])
   })
 })
+
+import { todayLocalISO } from './format.js'
+
+describe('todayLocalISO', () => {
+  it('returns the LOCAL date in YYYY-MM-DD', () => {
+    const d = new Date()
+    const p = (n) => String(n).padStart(2, '0')
+    expect(todayLocalISO()).toBe(`${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`)
+  })
+
+  it('matches the strict format', () => {
+    expect(todayLocalISO()).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+  })
+})

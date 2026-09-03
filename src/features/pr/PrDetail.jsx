@@ -38,6 +38,7 @@ export default function PrDetail({ pr, user, onBack, onEdit, onDelete, onNotify 
   }, [pr.id])
 
   const changeStatus = async (id) => {
+    if (id === pr.status) return // no write, no duplicate owner notification
     try {
       await setStatus(pr.id, id)
       // Tell the PR owner their post changed status (skipped when the owner

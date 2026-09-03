@@ -18,7 +18,7 @@ import {
   deleteTask,
 } from '../services/teamBoardApi.js'
 import { firebaseEnabled } from '../services/firebase.js'
-import { emailUsername } from '../utils/format.js'
+import { emailUsername, todayLocalISO } from '../utils/format.js'
 import { card, chip, cx, toolbar, emptyState } from '../utils/ui.js'
 
 export default function TeamBoardPage({ user, onNotify }) {
@@ -203,8 +203,7 @@ export default function TeamBoardPage({ user, onNotify }) {
                             {t.targetDate && (
                               <span
                                 className={
-                                  t.status !== 'done' &&
-                                  t.targetDate < new Date().toISOString().slice(0, 10)
+                                  t.status !== 'done' && t.targetDate < todayLocalISO()
                                     ? 'font-semibold text-danger'
                                     : undefined
                                 }
