@@ -28,6 +28,12 @@ const ICONS = {
       <circle cx="17" cy="18.5" r="1.6" />
     </>
   ),
+  gen: (
+    <>
+      <path d="M6 21 21 6l-3-3L3 18z" />
+      <path d="m14 7 3 3M9 3v2M5 5l1.4 1.4M3 9h2M19 13v2M17 17l1.5 1.5" />
+    </>
+  ),
   board: (
     <>
       <rect x="3.5" y="4" width="5" height="16" rx="1.2" />

@@ -78,3 +78,19 @@ export function bestSpecLink(summary, links) {
   return best
 }
 
+
+// Reverse direction (Subtask Gen): which spec pages are already covered by an
+// existing subtask? Each subtask claims its single BEST-scoring page, so
+// sibling endpoints (get-order-detail vs list-orders) can't shadow each other.
+export function claimedSpecUrls(subtaskSummaries, links) {
+  const claimed = new Set()
+  for (const summary of subtaskSummaries || []) {
+    const best = bestSpecLink(summary, links)
+    if (best) claimed.add(best.url)
+  }
+  return claimed
+}
+
+// Bracket prefixes stripped from a page title → the raw spec name
+// ("[R6.1#5][S12] GRPC Foo" → "GRPC Foo").
+export const stripBrackets = (s) => (s || '').replace(/^(\s*\[[^\]]*\])+\s*/g, '').trim()

@@ -50,6 +50,10 @@ export default defineConfig(({ mode }) => {
         releaseField: (env.JIRA_RELEASE_FIELD || 'customfield_10127').trim(),
         // Jira custom field id holding story points (number field).
         pointField: (env.JIRA_POINT_FIELD || 'customfield_10016').trim(),
+        // Subtask Gen: only Confluence pages from this space become suggestions
+        // (empty = all mentioned pages), and the default name prefix.
+        specSpace: (env.CONFLUENCE_SPEC_SPACE || '').trim(),
+        subtaskPrefix: (env.SUBTASK_PREFIX || '').trim(),
       }),
     },
     test: {

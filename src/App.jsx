@@ -12,6 +12,7 @@ import TeamBoardPage from './pages/TeamBoardPage.jsx'
 import DeliveryPage from './pages/DeliveryPage.jsx'
 import PrBoardPage from './pages/PrBoardPage.jsx'
 import InboxPage from './pages/InboxPage.jsx'
+import SubtaskGenPage from './pages/SubtaskGenPage.jsx'
 import SettingsPage from './pages/SettingsPage.jsx'
 import LoginPage from './pages/LoginPage.jsx'
 import Spinner from './components/common/Spinner.jsx'
@@ -28,6 +29,7 @@ const NAV_ITEMS = [
   { id: 'my', label: 'My Tasks', path: '/my-tasks' },
   { id: 'team', label: 'Team Task', path: '/team-task' },
   { id: 'delivery', label: 'Delivery Tracking (beta)', path: '/delivery' },
+  { id: 'gen', label: 'Spec Wizard (beta)', path: '/subtask-gen' },
   ...(firebaseEnabled
     ? [
         { id: 'board', label: 'Team Board', path: '/team-board' },
@@ -193,6 +195,7 @@ function AppShell({ user, onLogout }) {
               onNotify={showToast}
             />
           )}
+          {tab === 'gen' && <SubtaskGenPage onNotify={showToast} />}
           {tab === 'board' && <TeamBoardPage user={user} onNotify={showToast} />}
           {tab === 'pr' && <PrBoardPage user={user} onNotify={showToast} />}
           {tab === 'inbox' && <InboxPage user={user} onNotify={showToast} />}

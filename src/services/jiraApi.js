@@ -78,6 +78,7 @@ export function fetchIssueDetail(key) {
     'subtasks',
     'comment',
     'attachment',
+    'project',
     CFG.releaseField,
   ].join(',')
   return jira(`/rest/api/3/issue/${key}?fields=${fields}`)
@@ -176,4 +177,48 @@ export async function fetchDescriptionsForKeys(keys) {
     out.push(...(await searchAll(`key in (${quote(chunk)})`, ['description'])))
   }
   return out
+}
+
+// ---- Subtask Gen (beta) ----
+
+// Confluence space key per page id (same Atlassian host + token via the proxy).
+const spaceCache = new Map()
+export async function fetchPageSpaces(pageIds) {
+  const missing = pageIds.filter((id) => !spaceCache.has(id))
+  for (let i = 0; i < missing.length; i += 5) {
+    await Promise.all(
+      missing.slice(i, i + 5).map(async (id) => {
+        try {
+          const c = await jira(`/wiki/rest/api/content/${id}?expand=space`)
+          spaceCache.set(id, c.space?.key || '')
+        } catch {
+          spaceCache.set(id, '') // page gone/no access → treated as "no space"
+        }
+      }),
+    )
+  }
+  return Object.fromEntries(pageIds.map((id) => [id, spaceCache.get(id) || '']))
+}
+
+// The project's sub-task issue type (needed to create subtasks).
+export async function fetchSubtaskType(projectKey) {
+  const p = await jira(`/rest/api/3/project/${projectKey}`)
+  return (p.issueTypes || []).find((t) => t.subtask) || null
+}
+
+// Bulk-create subtasks under a story. Returns { issues, errors }.
+export function createSubtasks({ parentKey, projectKey, typeId, names }) {
+  return jira('/rest/api/3/issue/bulk', {
+    method: 'POST',
+    body: {
+      issueUpdates: names.map((summary) => ({
+        fields: {
+          project: { key: projectKey },
+          parent: { key: parentKey },
+          issuetype: { id: typeId },
+          summary,
+        },
+      })),
+    },
+  })
 }
