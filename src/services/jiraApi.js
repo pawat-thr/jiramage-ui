@@ -206,17 +206,38 @@ export async function fetchSubtaskType(projectKey) {
   return (p.issueTypes || []).find((t) => t.subtask) || null
 }
 
-// Bulk-create subtasks under a story. Returns { issues, errors }.
-export function createSubtasks({ parentKey, projectKey, typeId, names }) {
+// Team emails → Jira accountIds (cached), for assigning generated subtasks.
+const accountCache = new Map()
+export async function resolveAccountIds(emails) {
+  const missing = emails.filter((e) => !accountCache.has(e))
+  for (let i = 0; i < missing.length; i += 5) {
+    await Promise.all(
+      missing.slice(i, i + 5).map(async (email) => {
+        try {
+          const users = await jira(`/rest/api/3/user/search?query=${encodeURIComponent(email)}`)
+          accountCache.set(email, users?.[0]?.accountId || null)
+        } catch {
+          accountCache.set(email, null)
+        }
+      }),
+    )
+  }
+  return Object.fromEntries(emails.map((e) => [e, accountCache.get(e) || null]))
+}
+
+// Bulk-create subtasks under a story. rows: [{ summary, assigneeId?, points? }]
+export function createSubtasks({ parentKey, projectKey, typeId, rows }) {
   return jira('/rest/api/3/issue/bulk', {
     method: 'POST',
     body: {
-      issueUpdates: names.map((summary) => ({
+      issueUpdates: rows.map((r) => ({
         fields: {
           project: { key: projectKey },
           parent: { key: parentKey },
           issuetype: { id: typeId },
-          summary,
+          summary: r.summary,
+          ...(r.assigneeId ? { assignee: { id: r.assigneeId } } : {}),
+          ...(r.points != null && r.points !== '' ? { [CFG.pointField]: Number(r.points) } : {}),
         },
       })),
     },

@@ -44,7 +44,13 @@ export const fmtPts = (n) => (n % 1 ? n.toFixed(1) : String(n))
 // The QA subtask taxonomy (matched against the [QA] subtask summary).
 export const QA_CATEGORIES = [
   { id: 'test_case', label: 'Test Case', re: /^\s*\[QA\]\s*test\s*case\s*$/i },
-  { id: 'test_review', label: 'Test Review', re: /review\s*test\s*case/i },
+  {
+    id: 'test_review',
+    label: 'Test Review & Execution Support (Partner)',
+    // matches both the old "Review test case" and the new
+    // "Test Review & Execution Support (Partner)" subtask names
+    re: /review\s*test\s*case|test\s*review/i,
+  },
   { id: 'data_sit', label: 'Test Data on SIT', re: /test\s*data\s*on\s*sit/i },
   { id: 'exec_sit', label: 'Test Execute SIT', re: /test\s*execute\s*(on\s*)?sit/i },
   { id: 'data_uat', label: 'Test Data on UAT & Regression', re: /test\s*data\s*on\s*uat/i },

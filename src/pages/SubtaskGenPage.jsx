@@ -9,8 +9,10 @@ import {
   fetchIssueDetail,
   fetchSubtaskType,
   createSubtasks,
+  resolveAccountIds,
   browseUrl,
 } from '../services/jiraApi.js'
+import { emailUsername } from '../utils/format.js'
 import { claimedSpecUrls, stripBrackets } from '../features/issues/specMatch.js'
 import { CFG } from '../config/appConfig.js'
 import { card, cx, emptyState, searchInput, toolbar } from '../utils/ui.js'
@@ -20,8 +22,41 @@ const input =
 
 const pageIdOf = (url) => /pageId=(\d+)|\/pages\/(\d+)/.exec(url || '')?.slice(1).find(Boolean)
 
-// One suggestion row: editable name + the source spec underneath.
-function SuggestionRow({ sug, onRename, onRemove }) {
+const MEMBERS = [CFG.email, ...CFG.teamEmails]
+
+// Compact per-row controls: assignee (team env) + story points.
+function RowControls({ sug, onPatch }) {
+  return (
+    <div className="mt-1.5 flex items-center gap-2">
+      <select
+        className="rounded-lg border border-line bg-field px-2 py-1 text-xs text-ink-soft focus:border-accent"
+        value={sug.assignee || ''}
+        onChange={(e) => onPatch(sug.id, { assignee: e.target.value })}
+        title="Assignee"
+      >
+        <option value="">unassigned</option>
+        {MEMBERS.map((email) => (
+          <option key={email} value={email}>
+            {emailUsername(email)}
+          </option>
+        ))}
+      </select>
+      <input
+        type="number"
+        min="0"
+        step="0.5"
+        className="w-20 rounded-lg border border-line bg-field px-2 py-1 text-xs text-ink-soft focus:border-accent"
+        placeholder="points"
+        value={sug.points ?? ''}
+        onChange={(e) => onPatch(sug.id, { points: e.target.value })}
+        title="Story points"
+      />
+    </div>
+  )
+}
+
+// One suggestion row: editable name + assignee/points + the source spec underneath.
+function SuggestionRow({ sug, onRename, onPatch, onRemove }) {
   return (
     <div className="flex items-start gap-3 border-b border-line px-5 py-3.5 last:border-b-0">
       <span className="mt-2.5 size-2 shrink-0 rounded-full bg-accent" />
@@ -31,6 +66,7 @@ function SuggestionRow({ sug, onRename, onRemove }) {
           value={sug.name}
           onChange={(e) => onRename(sug.id, e.target.value)}
         />
+        <RowControls sug={sug} onPatch={onPatch} />
         <a
           className="mt-1 block truncate text-xs text-muted hover:text-blue hover:underline"
           href={sug.url}
@@ -71,6 +107,10 @@ export default function SubtaskGenPage({ onNotify }) {
   const [subtaskType, setSubtaskType] = useState(undefined) // undefined=loading, null=unavailable
   const [creating, setCreating] = useState(false)
   const [created, setCreated] = useState(null) // [{key}]
+  const [accountIds, setAccountIds] = useState({}) // email -> accountId
+  useEffect(() => {
+    resolveAccountIds(MEMBERS).then(setAccountIds).catch(() => {})
+  }, [])
 
   const doSearch = async (e) => {
     e?.preventDefault()
@@ -151,6 +191,11 @@ export default function SubtaskGenPage({ onNotify }) {
       ...a,
       suggestions: a.suggestions.map((s) => (s.id === id ? { ...s, name } : s)),
     }))
+  const patch = (id, upd) =>
+    setAnalysis((a) => ({
+      ...a,
+      suggestions: a.suggestions.map((s) => (s.id === id ? { ...s, ...upd } : s)),
+    }))
   const remove = (id) =>
     setAnalysis((a) => ({ ...a, suggestions: a.suggestions.filter((s) => s.id !== id) }))
   const addCustom = () =>
@@ -167,7 +212,13 @@ export default function SubtaskGenPage({ onNotify }) {
       ],
     }))
 
-  const validNames = (analysis?.suggestions || []).map((s) => s.name.trim()).filter(Boolean)
+  const validRows = (analysis?.suggestions || [])
+    .filter((s) => s.name.trim())
+    .map((s) => ({
+      summary: s.name.trim(),
+      assigneeId: s.assignee ? accountIds[s.assignee] : null,
+      points: s.points,
+    }))
 
   const create = async () => {
     setCreating(true)
@@ -176,7 +227,7 @@ export default function SubtaskGenPage({ onNotify }) {
         parentKey: story.key,
         projectKey: story.fields.project?.key || story.key.split('-')[0],
         typeId: subtaskType.id,
-        names: validNames,
+        rows: validRows,
       })
       const made = res?.issues || []
       const errs = res?.errors || []
@@ -337,7 +388,7 @@ export default function SubtaskGenPage({ onNotify }) {
                 ) : (
                   analysis.suggestions.map((sug) =>
                     sug.url ? (
-                      <SuggestionRow key={sug.id} sug={sug} onRename={rename} onRemove={remove} />
+                      <SuggestionRow key={sug.id} sug={sug} onRename={rename} onPatch={patch} onRemove={remove} />
                     ) : (
                       <div key={sug.id} className="flex items-start gap-3 border-b border-line px-5 py-3.5 last:border-b-0">
                         <span className="mt-2.5 size-2 shrink-0 rounded-full bg-violet" />
@@ -349,6 +400,7 @@ export default function SubtaskGenPage({ onNotify }) {
                             value={sug.name}
                             onChange={(e) => rename(sug.id, e.target.value)}
                           />
+                          <RowControls sug={sug} onPatch={patch} />
                           <span className="mt-1 block text-xs text-muted">custom — not from a spec</span>
                         </div>
                         <button
@@ -389,7 +441,7 @@ export default function SubtaskGenPage({ onNotify }) {
 
               <div className="sticky bottom-4 flex justify-end">
                 <button
-                  disabled={creating || !validNames.length || !subtaskType}
+                  disabled={creating || !validRows.length || !subtaskType}
                   onClick={create}
                   title={
                     subtaskType === null
@@ -400,7 +452,7 @@ export default function SubtaskGenPage({ onNotify }) {
                 >
                   {creating
                     ? 'Creating…'
-                    : `Create ${validNames.length} subtask${validNames.length === 1 ? '' : 's'} on ${story.key}`}
+                    : `Create ${validRows.length} subtask${validRows.length === 1 ? '' : 's'} on ${story.key}`}
                 </button>
               </div>
             </>

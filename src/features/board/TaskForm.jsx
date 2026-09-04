@@ -128,7 +128,7 @@ export default function TaskForm({ task, labels, onClose, onSubmit }) {
       wide
       hideFooter
     >
-      <form onSubmit={submit} className="grid max-h-[74vh] gap-5 overflow-y-auto pr-1">
+      <form onSubmit={submit} className="grid max-h-[74vh] gap-5 overflow-x-hidden overflow-y-auto pr-1">
         {error && (
           <div className="rounded-xl border border-danger bg-danger-soft px-4 py-2.5 text-[13px] text-danger">
             {error}
@@ -153,7 +153,7 @@ export default function TaskForm({ task, labels, onClose, onSubmit }) {
 
         {refOn ? (
           refKey ? (
-            <div className="flex items-center gap-2 rounded-xl border border-accent bg-accent-soft px-3.5 py-2.5 text-sm">
+            <div className="flex min-w-0 items-center gap-2 rounded-xl border border-accent bg-accent-soft px-3.5 py-2.5 text-sm">
               <span className="shrink-0 font-semibold text-accent-bright">{refKey}</span>
               <span className="min-w-0 flex-1 truncate text-ink-soft">{refSummary}</span>
               <button
@@ -195,7 +195,7 @@ export default function TaskForm({ task, labels, onClose, onSubmit }) {
                     <button
                       key={iss.key}
                       type="button"
-                      className="flex items-center gap-2 rounded-xl border border-line bg-field px-3.5 py-2 text-left text-sm hover:border-accent"
+                      className="flex min-w-0 items-center gap-2 rounded-xl border border-line bg-field px-3.5 py-2 text-left text-sm hover:border-accent"
                       onClick={() => {
                         setRefKey(iss.key)
                         setRefSummary(iss.fields.summary)
