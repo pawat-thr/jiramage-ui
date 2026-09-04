@@ -2,9 +2,10 @@ import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { execSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
 
 // Short git commit hash for the build code (Minecraft-snapshot style),
-// e.g. v0.1.7-beta.2+a3f9c2d. Falls back to "dev" outside a git checkout.
+// e.g. v0.1.7+a3f9c2d. Falls back to "dev" outside a git checkout.
 function gitHash() {
   try {
     return execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] })
@@ -31,13 +32,17 @@ const list = (raw, upper = false) =>
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
+  // Version comes from package.json. Pre-releases (0.1.8-beta.1) carry the git
+  // hash so testers can pin the exact build; FULL versions show clean (v0.1.7).
+  const version = JSON.parse(readFileSync('./package.json', 'utf8')).version
+  const appVersion = 'v' + version + (version.includes('-') ? '+' + gitHash() : '')
   const auth =
     'Basic ' + Buffer.from(`${env.JIRA_EMAIL}:${env.JIRA_TOKEN}`).toString('base64')
 
   return {
     plugins: [react(), tailwindcss()],
     define: {
-      __BUILD_HASH__: JSON.stringify(gitHash()),
+      __APP_VERSION__: JSON.stringify(appVersion),
       // Non-secret config only — the token stays inside the dev-server proxy.
       __APP_CONFIG__: JSON.stringify({
         jiraUrl: env.JIRA_URL || '',
@@ -50,10 +55,16 @@ export default defineConfig(({ mode }) => {
         releaseField: (env.JIRA_RELEASE_FIELD || 'customfield_10127').trim(),
         // Jira custom field id holding story points (number field).
         pointField: (env.JIRA_POINT_FIELD || 'customfield_10016').trim(),
-        // Subtask Gen: only Confluence pages from this space become suggestions
-        // (empty = all mentioned pages), and the default name prefix.
+        // Spec Wizard: only Confluence pages from this space become suggestions
+        // (empty = all mentioned pages), plus per-role subtask name prefixes.
         specSpace: (env.CONFLUENCE_SPEC_SPACE || '').trim(),
-        subtaskPrefix: (env.SUBTASK_PREFIX || '').trim(),
+        subtaskPrefixBe: (env.SUBTASK_PREFIX_BE || env.SUBTASK_PREFIX || '').trim(),
+        subtaskPrefixFe: (env.SUBTASK_PREFIX_FE || '[FE]').trim(),
+        subtaskPrefixQa: (env.SUBTASK_PREFIX_QA || '[QA]').trim(),
+        // Integration Plan: one target-date column per role.
+        integrationRoles: list(env.INTEGRATION_ROLES).length
+          ? list(env.INTEGRATION_ROLES)
+          : ['BE', 'WEB', 'MOB'],
       }),
     },
     test: {
@@ -77,7 +88,7 @@ export default defineConfig(({ mode }) => {
                   proxyReq.removeHeader(h)
                 }
               }
-              proxyReq.setHeader('User-Agent', 'jiramage-ui/0.1.7-beta.2')
+              proxyReq.setHeader('User-Agent', 'jiramage-ui/0.1.7')
               proxyReq.setHeader('X-Atlassian-Token', 'no-check')
             })
           },

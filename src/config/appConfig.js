@@ -3,7 +3,8 @@
 export const CFG = __APP_CONFIG__
 
 export const APP_NAME = 'jiramage'
-// Base version + git commit code, e.g. "v0.1.7-beta.2+a3f9c2d".
-export const APP_VERSION = `v0.1.7-beta.2+${__BUILD_HASH__}`
+// From package.json via vite: full versions show clean ("v0.1.7"); pre-release
+// versions carry the build hash ("v0.1.8-beta.1+a3f9c2d").
+export const APP_VERSION = __APP_VERSION__
 export const APP_CREDIT = 'by MpLab'
 export const APP_COPYRIGHT = `© ${new Date().getFullYear()} MpLab`

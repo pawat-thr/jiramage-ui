@@ -12,6 +12,7 @@ import TeamBoardPage from './pages/TeamBoardPage.jsx'
 import DeliveryPage from './pages/DeliveryPage.jsx'
 import PrBoardPage from './pages/PrBoardPage.jsx'
 import InboxPage from './pages/InboxPage.jsx'
+import IntegrationPage from './pages/IntegrationPage.jsx'
 import SubtaskGenPage from './pages/SubtaskGenPage.jsx'
 import SettingsPage from './pages/SettingsPage.jsx'
 import LoginPage from './pages/LoginPage.jsx'
@@ -34,6 +35,7 @@ const NAV_ITEMS = [
     ? [
         { id: 'board', label: 'Team Board', path: '/team-board' },
         { id: 'pr', label: 'PR Review', path: '/pr-review' },
+        { id: 'integration', label: 'Integration Plan', path: '/integration' },
         { id: 'inbox', label: 'Inbox', path: '/inbox' },
       ]
     : []),
@@ -198,6 +200,9 @@ function AppShell({ user, onLogout }) {
           {tab === 'gen' && <SubtaskGenPage onNotify={showToast} />}
           {tab === 'board' && <TeamBoardPage user={user} onNotify={showToast} />}
           {tab === 'pr' && <PrBoardPage user={user} onNotify={showToast} />}
+          {tab === 'integration' && (
+            <IntegrationPage defaultRelease={defaultRelease} onNotify={showToast} />
+          )}
           {tab === 'inbox' && <InboxPage user={user} onNotify={showToast} />}
           {tab === 'settings' && <SettingsPage onNotify={showToast} user={user} />}
           </div>

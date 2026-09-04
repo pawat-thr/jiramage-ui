@@ -92,6 +92,12 @@ service cloud.firestore {
       allow read, write: if signedIn();
     }
 
+    // Integration Plan rows (per release+story): any member can read, sync
+    // (create/delete during sync), and edit env/dates/remark.
+    match /integration/{docId} {
+      allow read, write: if signedIn();
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

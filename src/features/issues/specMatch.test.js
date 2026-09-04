@@ -102,3 +102,35 @@ describe('camelCase GRPC names (real case: DX-32428/DX-32456)', () => {
     expect(bestSpecUrl('[BE][MP] GRPC ReservePreOrder', links)).toContain('pageId=2029551618')
   })
 })
+
+import { claimedSpecUrls, stripBrackets } from './specMatch.js'
+
+describe('claimedSpecUrls (Spec Wizard dedupe)', () => {
+  const pages = [
+    { url: 'https://x.atlassian.net/wiki/pages/viewpage.action?pageId=1', title: '[R6.1#5][S12] POST /campaigns/v1/mp-merchant/pre-order/orders/get-order-detail' },
+    { url: 'https://x.atlassian.net/wiki/pages/viewpage.action?pageId=2', title: '[R6.1#5][S12] POST /campaigns/v1/mp-merchant/pre-order/orders/list-orders' },
+    { url: 'https://x.atlassian.net/wiki/pages/viewpage.action?pageId=3', title: '[R6.1#5][S12] Preorder - Enhance Pre-order Lists & Details' },
+  ]
+
+  it('each subtask claims its own best page — siblings do not shadow each other', () => {
+    const claimed = claimedSpecUrls(
+      ['[BE][MP] mp-merchant/pre-order/orders/get-order-detail', '[BE][MP] mp-merchant/pre-order/orders/list-orders'],
+      pages,
+    )
+    expect(claimed.has('https://x.atlassian.net/wiki/pages/viewpage.action?pageId=1')).toBe(true)
+    expect(claimed.has('https://x.atlassian.net/wiki/pages/viewpage.action?pageId=2')).toBe(true)
+    expect(claimed.has('https://x.atlassian.net/wiki/pages/viewpage.action?pageId=3')).toBe(false)
+  })
+
+  it('unrelated subtasks claim nothing', () => {
+    expect(claimedSpecUrls(['[MM][FE] Order List Screen - Update UI'], pages).size).toBe(0)
+  })
+})
+
+describe('stripBrackets', () => {
+  it('removes leading bracket groups only', () => {
+    expect(stripBrackets('[R6.1#5][S12] GRPC Foo')).toBe('GRPC Foo')
+    expect(stripBrackets('No brackets here')).toBe('No brackets here')
+    expect(stripBrackets('[QA] Support UAT (Partner)')).toBe('Support UAT (Partner)')
+  })
+})

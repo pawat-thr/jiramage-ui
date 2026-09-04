@@ -41,6 +41,14 @@ const ICONS = {
       <rect x="15.5" y="4" width="5" height="7" rx="1.2" />
     </>
   ),
+  integration: (
+    <>
+      <circle cx="5.5" cy="12" r="2.5" />
+      <circle cx="18.5" cy="5.5" r="2.5" />
+      <circle cx="18.5" cy="18.5" r="2.5" />
+      <path d="M7.8 10.8 16.2 6.7M7.8 13.2l8.4 4.1" />
+    </>
+  ),
   inbox: (
     <>
       <path d="M4 5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z" />

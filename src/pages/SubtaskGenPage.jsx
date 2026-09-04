@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import Spinner from '../components/common/Spinner.jsx'
 import StatusBadge from '../components/common/StatusBadge.jsx'
@@ -14,61 +14,77 @@ import {
 } from '../services/jiraApi.js'
 import { emailUsername } from '../utils/format.js'
 import { claimedSpecUrls, stripBrackets } from '../features/issues/specMatch.js'
+import { QA_CATEGORIES } from '../features/delivery/deliveryUtils.js'
 import { CFG } from '../config/appConfig.js'
 import { card, cx, emptyState, searchInput, toolbar } from '../utils/ui.js'
 
 const input =
   'w-full rounded-xl border border-line bg-field px-3.5 py-2 text-sm text-ink placeholder:text-muted focus:border-accent'
 
+let customSeq = 0
 const pageIdOf = (url) => /pageId=(\d+)|\/pages\/(\d+)/.exec(url || '')?.slice(1).find(Boolean)
 
 const MEMBERS = [CFG.email, ...CFG.teamEmails]
 
-// Compact per-row controls: assignee (team env) + story points.
-function RowControls({ sug, onPatch }) {
-  return (
-    <div className="mt-1.5 flex items-center gap-2">
-      <select
-        className="rounded-lg border border-line bg-field px-2 py-1 text-xs text-ink-soft focus:border-accent"
-        value={sug.assignee || ''}
-        onChange={(e) => onPatch(sug.id, { assignee: e.target.value })}
-        title="Assignee"
-      >
-        <option value="">unassigned</option>
-        {MEMBERS.map((email) => (
-          <option key={email} value={email}>
-            {emailUsername(email)}
-          </option>
-        ))}
-      </select>
-      <input
-        type="number"
-        min="0"
-        step="0.5"
-        className="w-20 rounded-lg border border-line bg-field px-2 py-1 text-xs text-ink-soft focus:border-accent"
-        placeholder="points"
-        value={sug.points ?? ''}
-        onChange={(e) => onPatch(sug.id, { points: e.target.value })}
-        title="Story points"
-      />
-    </div>
-  )
+const ROLE_META = {
+  BE: { color: 'var(--color-violet)', prefix: CFG.subtaskPrefixBe, hint: 'from Confluence specs' },
+  FE: { color: 'var(--color-blue)', prefix: CFG.subtaskPrefixFe, hint: 'add what the story needs' },
+  QA: { color: 'var(--color-amber)', prefix: CFG.subtaskPrefixQa, hint: 'standard QA checklist' },
 }
+const withPrefix = (role, name) =>
+  `${ROLE_META[role].prefix ? ROLE_META[role].prefix + ' ' : ''}${name}`
 
-// One suggestion row: editable name + assignee/points + the source spec underneath.
-function SuggestionRow({ sug, onRename, onPatch, onRemove }) {
+// One compact row: dot · name · assignee · points · remove, spec link underneath.
+function Row({ sug, onRename, onPatch, onRemove }) {
   return (
-    <div className="flex items-start gap-3 border-b border-line px-5 py-3.5 last:border-b-0">
-      <span className="mt-2.5 size-2 shrink-0 rounded-full bg-accent" />
-      <div className="min-w-0 flex-1">
+    <div className="border-b border-line px-5 py-3 last:border-b-0">
+      <div className="flex flex-wrap items-center gap-2">
+        <span
+          className="size-2 shrink-0 rounded-full"
+          style={{ background: ROLE_META[sug.role].color }}
+        />
         <input
-          className={input}
+          autoFocus={!!sug.custom}
+          className={cx(input, 'min-w-[200px] flex-1')}
+          placeholder={`${sug.role} subtask name…`}
           value={sug.name}
           onChange={(e) => onRename(sug.id, e.target.value)}
         />
-        <RowControls sug={sug} onPatch={onPatch} />
+        <select
+          className="rounded-lg border border-line bg-field px-2 py-2 text-xs text-ink-soft focus:border-accent"
+          value={sug.assignee || ''}
+          onChange={(e) => onPatch(sug.id, { assignee: e.target.value })}
+          title="Assignee"
+        >
+          <option value="">unassigned</option>
+          {MEMBERS.map((email) => (
+            <option key={email} value={email}>
+              {emailUsername(email)}
+            </option>
+          ))}
+        </select>
+        <input
+          type="number"
+          min="0"
+          step="0.5"
+          className="w-16 rounded-lg border border-line bg-field px-2 py-2 text-xs text-ink-soft focus:border-accent"
+          placeholder="pts"
+          value={sug.points ?? ''}
+          onChange={(e) => onPatch(sug.id, { points: e.target.value })}
+          title="Story points"
+        />
+        <button
+          aria-label={`Remove ${sug.name || 'row'}`}
+          title="Remove"
+          className="grid size-8 shrink-0 place-items-center rounded-full text-muted transition-colors hover:bg-danger-soft hover:text-danger"
+          onClick={() => onRemove(sug.id)}
+        >
+          ✕
+        </button>
+      </div>
+      {sug.url && (
         <a
-          className="mt-1 block truncate text-xs text-muted hover:text-blue hover:underline"
+          className="mt-1 block truncate pl-4 text-xs text-muted hover:text-blue hover:underline"
           href={sug.url}
           target="_blank"
           rel="noreferrer"
@@ -76,15 +92,7 @@ function SuggestionRow({ sug, onRename, onPatch, onRemove }) {
         >
           from spec: {sug.title}
         </a>
-      </div>
-      <button
-        aria-label={`Remove ${sug.name}`}
-        title="Remove from the list"
-        className="mt-1.5 grid size-8 shrink-0 place-items-center rounded-full text-muted transition-colors hover:bg-danger-soft hover:text-danger"
-        onClick={() => onRemove(sug.id)}
-      >
-        ✕
-      </button>
+      )}
     </div>
   )
 }
@@ -108,6 +116,7 @@ export default function SubtaskGenPage({ onNotify }) {
   const [creating, setCreating] = useState(false)
   const [created, setCreated] = useState(null) // [{key}]
   const [accountIds, setAccountIds] = useState({}) // email -> accountId
+  const [role, setRole] = useState('BE') // active role tab
   useEffect(() => {
     resolveAccountIds(MEMBERS).then(setAccountIds).catch(() => {})
   }, [])
@@ -137,6 +146,7 @@ export default function SubtaskGenPage({ onNotify }) {
     setStory(null)
     setAnalysis(null)
     setCreated(null)
+    setSubtaskType(undefined) // re-resolve per project — never reuse another project's type
     ;(async () => {
       try {
         const [iss, remote] = await Promise.all([
@@ -170,13 +180,24 @@ export default function SubtaskGenPage({ onNotify }) {
           } else if (claimed.has(p.url)) {
             existing.push(p)
           } else {
-            suggestions.push({
-              ...p,
-              name: `${CFG.subtaskPrefix ? CFG.subtaskPrefix + ' ' : ''}${stripBrackets(p.title)}`,
-            })
+            suggestions.push({ ...p, role: 'BE', name: withPrefix('BE', stripBrackets(p.title)) })
           }
         }
-        setAnalysis({ suggestions, existing, skipped, pageCount: pages.length })
+        // QA: the standard 9-pattern checklist (QA Info categories) — categories
+        // already covered by an existing subtask are listed, not re-suggested.
+        const qaCovered = []
+        for (const c of QA_CATEGORIES) {
+          if (subs.some((sub) => c.re.test(sub))) qaCovered.push(c)
+          else
+            suggestions.push({
+              id: `qa-${c.id}`,
+              url: null,
+              title: null,
+              role: 'QA',
+              name: withPrefix('QA', c.label),
+            })
+        }
+        setAnalysis({ suggestions, existing, skipped, qaCovered, pageCount: pages.length })
       } catch (err) {
         if (on) onNotify(err.message, true)
       }
@@ -198,28 +219,37 @@ export default function SubtaskGenPage({ onNotify }) {
     }))
   const remove = (id) =>
     setAnalysis((a) => ({ ...a, suggestions: a.suggestions.filter((s) => s.id !== id) }))
-  const addCustom = () =>
+  const addCustom = (role) =>
     setAnalysis((a) => ({
       ...a,
       suggestions: [
         ...a.suggestions,
         {
-          id: `custom-${Date.now()}`,
+          id: `custom-${++customSeq}`,
           url: null,
           title: null,
-          name: CFG.subtaskPrefix ? CFG.subtaskPrefix + ' ' : '',
+          role,
+          custom: true,
+          name: ROLE_META[role].prefix ? ROLE_META[role].prefix + ' ' : '',
         },
       ],
     }))
 
+  // a row whose name is still just the role prefix doesn't count
+  const prefixes = Object.values(ROLE_META).map((r) => r.prefix)
   const validRows = (analysis?.suggestions || [])
-    .filter((s) => s.name.trim())
+    .filter((s) => s.name.trim() && !prefixes.includes(s.name.trim()))
     .map((s) => ({
+      id: s.id,
+      role: s.role,
       summary: s.name.trim(),
+      assigneeEmail: s.assignee || '',
       assigneeId: s.assignee ? accountIds[s.assignee] : null,
       points: s.points,
     }))
+  const roleRows = validRows.filter((r) => r.role === role)
 
+  // Creates ONLY the active role tab's rows; other tabs stay for later.
   const create = async () => {
     setCreating(true)
     try {
@@ -227,13 +257,29 @@ export default function SubtaskGenPage({ onNotify }) {
         parentKey: story.key,
         projectKey: story.fields.project?.key || story.key.split('-')[0],
         typeId: subtaskType.id,
-        rows: validRows,
+        rows: roleRows,
       })
       const made = res?.issues || []
       const errs = res?.errors || []
-      setCreated(made)
+      const unresolved = roleRows.filter((r) => r.assigneeEmail && !r.assigneeId)
+      if (unresolved.length)
+        onNotify(
+          `⚠ ${unresolved.length} row${unresolved.length === 1 ? '' : 's'} created UNASSIGNED — Jira account not found for the picked member`,
+          true,
+        )
+      setCreated((c) => [...(c || []), ...made])
+      // remove ONLY the rows that were actually created (bulk errors carry the
+      // failed index) — failed rows stay in the tab for a safe retry.
+      if (made.length) {
+        const failedIdx = new Set(errs.map((e) => e.failedElementNumber))
+        const createdIds = new Set(roleRows.filter((_, i) => !failedIdx.has(i)).map((r) => r.id))
+        setAnalysis((a) => ({
+          ...a,
+          suggestions: a.suggestions.filter((x) => !createdIds.has(x.id)),
+        }))
+      }
       if (errs.length) onNotify(`${made.length} created, ${errs.length} failed — see Jira`, true)
-      else onNotify(`✓ Created ${made.length} subtask${made.length === 1 ? '' : 's'} on ${story.key}`)
+      else onNotify(`✓ Created ${made.length} ${role} subtask${made.length === 1 ? '' : 's'} on ${story.key}`)
     } catch (err) {
       onNotify(err.message, true)
     } finally {
@@ -339,13 +385,12 @@ export default function SubtaskGenPage({ onNotify }) {
             </p>
           </div>
 
-          {created ? (
-            <div className={`${card} p-6 text-center`}>
-              <div className="text-3xl">🎉</div>
-              <h3 className="mt-2 text-base font-semibold">
-                Created {created.length} subtask{created.length === 1 ? '' : 's'} on {story.key}
-              </h3>
-              <div className="mt-3 flex flex-wrap justify-center gap-2">
+          {created && created.length > 0 && (
+            <div className={`${card} p-4`}>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm font-semibold text-success-bright">
+                  🎉 Created ({created.length})
+                </span>
                 {created.map((c) => (
                   <a
                     key={c.key}
@@ -358,74 +403,76 @@ export default function SubtaskGenPage({ onNotify }) {
                   </a>
                 ))}
               </div>
-              <button
-                className="mt-5 rounded-full border border-line bg-panel px-5 py-2 text-sm text-ink-soft hover:border-line-strong hover:text-ink"
-                onClick={() => navigate('/subtask-gen')}
-              >
-                Generate for another story
-              </button>
             </div>
-          ) : (
-            <>
+          )}
+
               <div className={card}>
-                <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
-                  <h3 className="text-sm font-semibold">
-                    Suggested subtasks{' '}
-                    <span className="text-muted">({analysis.suggestions.length})</span>
-                  </h3>
-                  <button
-                    className="rounded-full border border-line bg-field px-3.5 py-1.5 text-[13px] text-ink-soft transition-colors hover:border-accent hover:text-accent-bright"
-                    onClick={addCustom}
-                  >
-                    + Add custom
-                  </button>
-                </div>
-                {analysis.suggestions.length === 0 ? (
-                  <div className={emptyState}>
-                    Nothing to suggest — every matching spec already has a subtask, or none were
-                    found. Add a custom row if you still need one.
-                  </div>
-                ) : (
-                  analysis.suggestions.map((sug) =>
-                    sug.url ? (
-                      <SuggestionRow key={sug.id} sug={sug} onRename={rename} onPatch={patch} onRemove={remove} />
-                    ) : (
-                      <div key={sug.id} className="flex items-start gap-3 border-b border-line px-5 py-3.5 last:border-b-0">
-                        <span className="mt-2.5 size-2 shrink-0 rounded-full bg-violet" />
-                        <div className="min-w-0 flex-1">
-                          <input
-                            autoFocus
-                            className={input}
-                            placeholder="Custom subtask name…"
-                            value={sug.name}
-                            onChange={(e) => rename(sug.id, e.target.value)}
-                          />
-                          <RowControls sug={sug} onPatch={patch} />
-                          <span className="mt-1 block text-xs text-muted">custom — not from a spec</span>
-                        </div>
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-3">
+                  <div className="inline-flex rounded-xl border border-line bg-field p-1">
+                    {['BE', 'FE', 'QA'].map((r) => {
+                      const n = analysis.suggestions.filter((x) => x.role === r).length
+                      return (
                         <button
-                          aria-label="Remove custom subtask"
-                          className="mt-1.5 grid size-8 shrink-0 place-items-center rounded-full text-muted transition-colors hover:bg-danger-soft hover:text-danger"
-                          onClick={() => remove(sug.id)}
+                          key={r}
+                          className={cx(
+                            'flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-[13px] font-medium transition-colors',
+                            role === r ? 'bg-accent-soft text-accent-bright' : 'text-ink-soft hover:text-ink',
+                          )}
+                          onClick={() => setRole(r)}
                         >
-                          ✕
+                          <span className="size-2 rounded-full" style={{ background: ROLE_META[r].color }} />
+                          {r}
+                          <span className={role === r ? 'opacity-80' : 'text-muted'}>{n}</span>
                         </button>
+                      )
+                    })}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-muted max-sm:hidden">{ROLE_META[role].hint}</span>
+                    <button
+                      className="rounded-full border border-line bg-field px-3.5 py-1.5 text-[13px] text-ink-soft transition-colors hover:border-accent hover:text-accent-bright"
+                      onClick={() => addCustom(role)}
+                    >
+                      + Add {role}
+                    </button>
+                  </div>
+                </div>
+                {(() => {
+                  const rows = analysis.suggestions.filter((x) => x.role === role)
+                  if (!rows.length)
+                    return (
+                      <div className="px-5 py-5 text-[13px] text-muted">
+                        {role === 'FE'
+                          ? 'No FE rows yet — add the screens/UI work this story needs.'
+                          : role === 'QA'
+                            ? 'Full QA checklist already covered by existing subtasks. ✓'
+                            : 'Every matching spec already has a subtask (or none were found).'}
                       </div>
-                    ),
-                  )
-                )}
+                    )
+                  return rows.map((sug) => (
+                    <Row key={sug.id} sug={sug} onRename={rename} onPatch={patch} onRemove={remove} />
+                  ))
+                })()}
               </div>
 
-              {analysis.existing.length > 0 && (
+              {(analysis.existing.length > 0 || analysis.qaCovered.length > 0) && (
                 <div className={card}>
                   <div className="border-b border-line px-5 py-3.5">
                     <h3 className="text-sm font-semibold text-success-bright">
-                      ✓ Already covered <span className="text-muted">({analysis.existing.length})</span>
+                      ✓ Already covered{' '}
+                      <span className="text-muted">({analysis.existing.length + analysis.qaCovered.length})</span>
                     </h3>
                   </div>
                   {analysis.existing.map((p) => (
                     <div key={p.id} className="truncate border-b border-line px-5 py-2.5 text-[13px] text-muted last:border-b-0" title={p.title}>
+                      <span className="mr-1.5 font-medium" style={{ color: ROLE_META.BE.color }}>BE</span>
                       {p.title}
+                    </div>
+                  ))}
+                  {analysis.qaCovered.map((c) => (
+                    <div key={c.id} className="truncate border-b border-line px-5 py-2.5 text-[13px] text-muted last:border-b-0">
+                      <span className="mr-1.5 font-medium" style={{ color: ROLE_META.QA.color }}>QA</span>
+                      {c.label}
                     </div>
                   ))}
                 </div>
@@ -441,22 +488,20 @@ export default function SubtaskGenPage({ onNotify }) {
 
               <div className="sticky bottom-4 flex justify-end">
                 <button
-                  disabled={creating || !validRows.length || !subtaskType}
+                  disabled={creating || !roleRows.length || !subtaskType}
                   onClick={create}
                   title={
                     subtaskType === null
                       ? 'No sub-task issue type available in this project'
-                      : undefined
+                      : `Creates only the ${role} tab — other tabs stay for later`
                   }
                   className="rounded-full border border-accent bg-accent px-7 py-3 text-sm font-semibold text-white shadow-lift transition-colors hover:bg-accent-bright disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {creating
                     ? 'Creating…'
-                    : `Create ${validRows.length} subtask${validRows.length === 1 ? '' : 's'} on ${story.key}`}
+                    : `Create ${roleRows.length} ${role} subtask${roleRows.length === 1 ? '' : 's'} on ${story.key}`}
                 </button>
               </div>
-            </>
-          )}
         </>
       )}
     </div>
