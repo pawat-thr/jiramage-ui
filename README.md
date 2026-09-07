@@ -2,7 +2,7 @@
 
 A web dashboard & team hub for Jira Cloud — the web rebuild of [jiramage](../jiramage), built with **React + Vite + Tailwind CSS**. Dark/light/system theming with a red accent, real URL routing, and two modes: **individual** (Jira only, zero setup beyond `.env`) and **team** (adds Firebase login + collaboration boards, notifications, and shared settings).
 
-v0.1.7-beta.2 · by MpLab · MIT License · versions read `v0.1.7-beta.N+<git hash>` — the hash pins the exact commit a build came from
+v0.1.7 · by MpLab · MIT License · full versions display clean (`v0.1.7`); pre-releases append the git build hash (`v0.1.8-beta.1+a3f9c2d`)
 
 ---
 
@@ -14,12 +14,14 @@ v0.1.7-beta.2 · by MpLab · MIT License · versions read `v0.1.7-beta.N+<git ha
 | **My Tasks** | `/my-tasks` | both | Your issues, grouped by work type — search, type & status filters; subtasks show their parent story, a **Spec ↗** chip to the matching Confluence page, and a **⚡ Prompt** generator |
 | **Team Task** | `/team-task` | both | Team issues — member/type/status filters, search, transition & reassign actions, same Spec/Prompt chips |
 | **Delivery Tracking (beta)** | `/delivery` | both | PM view of a Release: overall & per-role (FE/BE/QA) point progress, **QA Info view** (10 QA categories, frozen columns, type×state filter), Excel-style table sorted least-done-first, **.xlsx export** (Delivery + QA sheets), full story detail at `/delivery/DX-123` |
+| **Spec Wizard (beta)** | `/subtask-gen` | both | Search a story → its mentioned Confluence specs become a subtask checklist in **BE / FE / QA role tabs** (QA = the standard 9-pattern checklist), with dedupe against existing subtasks, per-row assignee + points, and per-role bulk create |
+| **Integration Plan** | `/integration` | team | Per-release planning grid synced from Jira on demand — frozen Key/Name/Status + editable Env, per-role target dates, Remark; local edits with an explicit batch **Save** button |
 | **Team Board** | `/team-board` | team | Label-grouped task board — link a ref story or internal work, assign users (scales to 20+), ENV, sprint start, target date (overdue in red); owner edits, anyone moves status |
 | **PR Review** | `/pr-review` | team | Post GitHub PRs, assign reviewers, **"Waiting for your review"** section on top, status changes, comments with **@mentions** — live via Firestore |
 | **Inbox** | `/inbox` | team | Notification history (review assignments, status changes on your PRs, comments, mentions) — All/Unread tabs, mark read, delete |
 | **Settings** | `/settings` | both | Editable zone (theme, notification sound, team-shared **Dev Prompt template**, account/password in team mode) vs read-only "Fixed · .env" zone |
 
-Detail views have URLs too (`/delivery/DX-123`, `/team-board/<id>`, `/pr-review/<id>`) — deep-linkable, browser back/forward works. Unknown URLs redirect home; `/login` bounces signed-in users to the dashboard.
+Detail views have URLs too (`/delivery/DX-123`, `/subtask-gen/DX-123`, `/integration/DX-123`, `/team-board/<id>`, `/pr-review/<id>`) — deep-linkable, browser back/forward works. Unknown URLs redirect home; `/login` bounces signed-in users to the dashboard.
 
 ## Highlights
 
@@ -30,7 +32,7 @@ Detail views have URLs too (`/delivery/DX-123`, `/team-board/<id>`, `/pr-review/
 - Collapsible sidebar (icon rail / mobile drawer), fully responsive (tables scroll sideways on phones), 80% UI density (popups full-size)
 - Keyboard shortcuts `1–8` switch pages; `h` toggles active-only (suppressed while a popup is open)
 - Release/story-point custom fields auto-configured (overridable via env)
-- **101 unit tests** + a 13-check **headless-Chrome e2e smoke suite**
+- **125 unit tests** + a 13-check **headless-Chrome e2e smoke suite**
 
 ## Setup
 
@@ -63,7 +65,7 @@ Individual mode hides everything Firebase-backed (Team Board, PR Review, Inbox, 
 
 Add your Firebase web config (`VITE_FIREBASE_*` vars — see `.env.example`) and the app switches to team mode: email/password login restricted to `JIRA_EMAIL` + `TEAM_EMAILS`, first-login password setup with a live rule checklist (≥8 chars, 1 uppercase, 1 number, 1 special), change-password in Settings, and the Team Board / PR Review / Inbox pages backed by Firestore. Per-user preferences and the team-wide Dev Prompt template sync via Firestore too.
 
-Firebase console setup: enable **Authentication → Email/Password**, create a **Firestore** database, and publish **`firestore.rules`** (the file in this repo is the source of truth — paste it in Build → Firestore → Rules whenever it changes). Collections used: `prs` (+comments), `tasks`, `labels`, `notifications`, `userPrefs`, `settings`.
+Firebase console setup: enable **Authentication → Email/Password**, create a **Firestore** database, and publish **`firestore.rules`** (the file in this repo is the source of truth — paste it in Build → Firestore → Rules whenever it changes). Collections used: `prs` (+comments), `tasks`, `labels`, `notifications`, `userPrefs`, `settings`, `integration`.
 
 > The team allowlist is enforced client-side, which suits a trusted internal team; a `beforeCreate` blocking Cloud Function would make it airtight.
 
@@ -82,9 +84,9 @@ src/
 │   ├── board/      # TaskForm, LabelForm, TaskDetail, boardConstants
 │   ├── pr/         # PrForm, PrDetail, mentions (@autocomplete), PrStatusBadge, prConstants
 │   └── inbox/      # notifText (shared notification row)
-├── pages/          # One component per page (see table above) + LoginPage
+├── pages/          # One component per page (see table above) + LoginPage, SubtaskGenPage, IntegrationPage
 ├── hooks/          # useJiraData, useAuth, usePrefs, useTheme, useToast, useKeyboardShortcuts
-├── services/       # jiraApi (REST+JQL), firebase, firebaseAuth, prApi, teamBoardApi, prefsApi, notificationsApi, settingsApi
+├── services/       # jiraApi (REST+JQL), firebase, firebaseAuth, prApi, teamBoardApi, prefsApi, notificationsApi, settingsApi, integrationApi
 ├── utils/          # format, ui (Tailwind recipes), password, prefs, theme, typeColors, notifSound (Web Audio ping)
 ├── config/         # appConfig — injected non-secret config + version/build hash
 └── styles/         # global.css — Tailwind @theme tokens, light/dark (gradient), zoom density
@@ -94,7 +96,7 @@ e2e/                # smoke.mjs — headless-Chrome UI automation (npm run test:
 ## Testing
 
 ```bash
-npm test            # 101 unit tests (Vitest + React Testing Library), ~2s, fully offline
+npm test            # 125 unit tests (Vitest + React Testing Library), ~2s, fully offline
 npm run test:watch  # watch mode
 npm run test:e2e    # 13-check UI smoke: boots a dev server (individual mode) + headless Chrome
 ```
@@ -103,10 +105,10 @@ Unit tests are colocated (`*.test.js(x)`); Jira/Firebase seams are mocked with `
 
 ## How auth to Jira works
 
-The browser never sees your API token. The Vite dev server proxies `/jira/*` to Jira Cloud, injecting the Basic-auth header server-side. Non-secret config is compiled in via `__APP_CONFIG__`; the short git hash is compiled in as `__BUILD_HASH__`.
+The browser never sees your API token. The Vite dev server proxies `/jira/*` to Jira Cloud, injecting the Basic-auth header server-side. Non-secret config is compiled in via `__APP_CONFIG__`; the display version is compiled in as `__APP_VERSION__` (from package.json, + git hash for pre-releases).
 
 > `npm run build` outputs static files to `dist/`, but they need a host providing the same `/jira` proxy — for local use, `npm run dev` is the intended way to run.
 
 ## Docs
 
-Per-version changelogs live in [`docs/`](docs/) — one file per version (`v0.1.0` → `v0.1.7`).
+Per-version changelogs live in [`docs/`](docs/) — one file per version (`v0.1.0` → `v0.1.7`). Accepted limitations are tracked in [`docs/KNOWN-ISSUES.md`](docs/KNOWN-ISSUES.md).
