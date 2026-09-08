@@ -1,11 +1,14 @@
 import { CFG } from '../../config/appConfig.js'
 
-// Working time: Mon–Fri, 09:30–18:30 (a 9h window holding 8 working hours —
-// lunch is pro-rated). Burn is expressed in MANDAYS (1 manday = 8 worked hours).
+// Working time: Mon–Fri, 09:30–12:00 and 13:00–18:30 (2.5h + 5.5h = 8 worked
+// hours/day, lunch excluded). Burn is expressed in MANDAYS (1 manday = 8h).
+// Hardcoded for this beta — a Settings "work time" option comes later.
 
-const DAY_START = { h: 9, m: 30 }
-const DAY_END = { h: 18, m: 30 }
-const WINDOW_HOURS = 9
+const WINDOWS = [
+  [{ h: 9, m: 30 }, { h: 12, m: 0 }],
+  [{ h: 13, m: 0 }, { h: 18, m: 30 }],
+]
+const HOURS_PER_DAY = 8
 
 const at = (date, { h, m }) => {
   const d = new Date(date)
@@ -23,15 +26,17 @@ export function workingMandays(startISO, end = new Date()) {
   cursor.setHours(0, 0, 0, 0)
   for (let i = 0; i < 400 && cursor <= end; i++) {
     if (!isWeekend(cursor)) {
-      const winStart = at(cursor, DAY_START)
-      const winEnd = at(cursor, DAY_END)
-      const from = start > winStart ? start : winStart
-      const to = end < winEnd ? end : winEnd
-      if (to > from) hours += (to - from) / 3600000
+      for (const [ws, we] of WINDOWS) {
+        const winStart = at(cursor, ws)
+        const winEnd = at(cursor, we)
+        const from = start > winStart ? start : winStart
+        const to = end < winEnd ? end : winEnd
+        if (to > from) hours += (to - from) / 3600000
+      }
     }
     cursor.setDate(cursor.getDate() + 1)
   }
-  return hours / WINDOW_HOURS
+  return hours / HOURS_PER_DAY
 }
 
 export const isBurnStatus = (name) =>

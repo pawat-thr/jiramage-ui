@@ -34,7 +34,7 @@ function BurnMeter({ mandays, points }) {
     return (
       <div
         className="text-[11px] whitespace-nowrap text-amber tabular-nums"
-        title={`${mandays.toFixed(1)} manday(s) in dev (Mon–Fri 9:30–18:30) — no estimate to compare, add points in Jira`}
+        title={`${mandays.toFixed(1)} manday(s) in dev (Mon–Fri 9:30–12:00 & 13:00–18:30) — no estimate to compare, add points in Jira`}
       >
         {burned.toFixed(1)} pt · no estimate
       </div>
@@ -45,7 +45,7 @@ function BurnMeter({ mandays, points }) {
   return (
     <div
       className="mt-1.5 w-[104px]"
-      title={`In dev ${mandays.toFixed(1)} manday(s) (Mon–Fri 9:30–18:30, 1d = 8pt): ${burned.toFixed(1)} of ${points} estimated points${ratio > 1 ? ' — OVER estimate' : ''}`}
+      title={`In dev ${mandays.toFixed(1)} manday(s) (Mon–Fri 9:30–12:00 & 13:00–18:30, 1d = 8pt): ${burned.toFixed(1)} of ${points} estimated points${ratio > 1 ? ' — OVER estimate' : ''}`}
     >
       <div className="flex items-baseline justify-between text-[11px] tabular-nums">
         <span className="font-semibold" style={{ color }}>

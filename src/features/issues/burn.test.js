@@ -5,8 +5,12 @@ import { workingMandays, firstBurnStart, isBurnStatus } from './burn.js'
 const D = (s) => new Date(s)
 
 describe('workingMandays', () => {
-  it('same day, inside working window: 4.5h of the 9h window = 0.5 manday', () => {
-    expect(workingMandays('2026-09-07T09:30:00', D('2026-09-07T14:00:00'))).toBeCloseTo(0.5, 5)
+  it('same day 9:30→14:00: 2.5h morning + 1h afternoon = 3.5h = 0.4375 manday', () => {
+    expect(workingMandays('2026-09-07T09:30:00', D('2026-09-07T14:00:00'))).toBeCloseTo(3.5 / 8, 5)
+  })
+
+  it('lunch 12:00→13:00 counts zero', () => {
+    expect(workingMandays('2026-09-07T12:00:00', D('2026-09-07T13:00:00'))).toBeCloseTo(0, 5)
   })
 
   it('full working day = 1 manday', () => {
