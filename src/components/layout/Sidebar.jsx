@@ -55,6 +55,12 @@ const ICONS = {
       <path d="M4 14h4.5l1.5 2.5h4l1.5-2.5H20" />
     </>
   ),
+  capacity: (
+    <>
+      <rect x="3.5" y="5" width="17" height="15.5" rx="2" />
+      <path d="M3.5 10h17M8 3v4M16 3v4M7.5 14h3M13.5 14h3M7.5 17.5h3" />
+    </>
+  ),
   settings: (
     <>
       <circle cx="12" cy="12" r="3" />

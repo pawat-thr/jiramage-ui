@@ -5,6 +5,7 @@ import TopBar from '../components/layout/TopBar.jsx'
 import Toast from '../components/common/Toast.jsx'
 import DashboardPage from '../pages/DashboardPage.jsx'
 import TeamPage from '../pages/TeamPage.jsx'
+import QaCapacityPage from './QaCapacityPage.jsx'
 import TransitionModal from '../features/issues/TransitionModal.jsx'
 import ReassignModal from '../features/issues/ReassignModal.jsx'
 import { fetchQaIssues } from '../services/jiraApi.js'
@@ -19,6 +20,7 @@ export const QA_BASE = '/jiramage/qa'
 const NAV_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', path: QA_BASE },
   { id: 'team', label: 'Team Task', path: `${QA_BASE}/team-task` },
+  { id: 'capacity', label: 'Capacity Planner', path: `${QA_BASE}/capacity` },
 ].map((t, i) => ({ ...t, key: String(i + 1) }))
 const PAGE_TITLES = Object.fromEntries(NAV_ITEMS.map((t) => [t.id, t.label]))
 
@@ -132,6 +134,7 @@ export default function QaApp({ user, onLogout }) {
                   burnStatuses={CFG.qaBurnStatuses}
                 />
               ))}
+            {tab === 'capacity' && <QaCapacityPage onNotify={showToast} />}
             {tab === 'team' && (
               <TeamPage
                 issues={issues}

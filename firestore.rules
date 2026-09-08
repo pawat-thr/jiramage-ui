@@ -98,6 +98,12 @@ service cloud.firestore {
       allow read, write: if signedIn();
     }
 
+    // QA Capacity Planner: one doc per QA user per month; any member can
+    // read and update the plan.
+    match /qaPlan/{docId} {
+      allow read, write: if signedIn();
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

@@ -61,7 +61,13 @@ try {
   // ---- my tasks / team task ----
   for (const path of ['/my-tasks', '/team-task']) {
     await page.goto(BASE + path, { waitUntil: 'networkidle0' })
-    await page.waitForFunction(() => document.querySelectorAll('table tr').length > 2, { timeout: 60000 })
+    // data-dependent: an empty result set (e.g. no active tasks assigned to me) still passes
+    await page.waitForFunction(
+      () =>
+        document.querySelectorAll('table tr').length > 2 ||
+        document.body.textContent.includes('No issues match'),
+      { timeout: 60000 },
+    )
     ok(`${path} table renders`, true)
   }
 
