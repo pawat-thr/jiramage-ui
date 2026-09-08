@@ -7,8 +7,12 @@ const fmtPts = (n) => (n % 1 ? n.toFixed(1) : String(n))
 const heat = (ratio) =>
   `color-mix(in oklab, var(--color-danger) ${Math.round(Math.min(1, ratio) * 100)}%, var(--color-slate))`
 
-// Per member: active subtasks + summed story points.
-export default function SubtaskPoints({ rows }) {
+// Per member burn: sum burned points vs estimated points of their in-dev cards.
+const burnColor = (ratio) =>
+  ratio > 1 ? 'var(--color-danger)' : ratio >= 0.75 ? 'var(--color-amber)' : 'var(--color-blue)'
+
+// Per member: active subtasks + summed story points (+ dev burn when present).
+export default function SubtaskPoints({ rows, memberBurn = {} }) {
   const maxPoints = Math.max(1, ...rows.map((r) => r.points))
   const total = rows.reduce((a, r) => ({ count: a.count + r.count, points: a.points + r.points }), {
     count: 0,
@@ -21,7 +25,8 @@ export default function SubtaskPoints({ rows }) {
         <h2 className="text-sm font-semibold">Active subtasks · points</h2>
         <span className="text-xs text-muted">
           {total.count} subtask{total.count === 1 ? '' : 's'} · {fmtPts(total.points)} pts total ·{' '}
-          <span className="text-danger">redder = heavier load</span>
+          <span className="text-danger">redder = heavier load</span> ·{' '}
+          <span className="text-blue">thin bar = dev burn vs estimate</span>
         </span>
       </div>
 
@@ -64,6 +69,29 @@ export default function SubtaskPoints({ rows }) {
                   {fmtPts(r.points)} pts
                 </span>
               </span>
+              {memberBurn[r.key] && memberBurn[r.key].estimate > 0 && (
+                <>
+                  <span aria-hidden />
+                  <span
+                    className="block h-1.5 rounded-[4px] bg-field"
+                    title={`Dev burn: ${memberBurn[r.key].burned.toFixed(1)} of ${fmtPts(memberBurn[r.key].estimate)} estimated pts on in-dev cards (1 manday = 8 pt)`}
+                  >
+                    <span
+                      className="block h-full rounded-[4px] transition-[width] duration-500"
+                      style={{
+                        width: `${Math.min(memberBurn[r.key].burned / memberBurn[r.key].estimate, 1) * 100}%`,
+                        background: burnColor(memberBurn[r.key].burned / memberBurn[r.key].estimate),
+                      }}
+                    />
+                  </span>
+                  <span
+                    className="text-right text-[11px] whitespace-nowrap tabular-nums"
+                    style={{ color: burnColor(memberBurn[r.key].burned / memberBurn[r.key].estimate) }}
+                  >
+                    burn {memberBurn[r.key].burned.toFixed(1)} / {fmtPts(memberBurn[r.key].estimate)}
+                  </span>
+                </>
+              )}
             </div>
           ))}
         </div>

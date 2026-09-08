@@ -61,6 +61,10 @@ export default defineConfig(({ mode }) => {
         subtaskPrefixBe: (env.SUBTASK_PREFIX_BE || env.SUBTASK_PREFIX || '').trim(),
         subtaskPrefixFe: (env.SUBTASK_PREFIX_FE || '[FE]').trim(),
         subtaskPrefixQa: (env.SUBTASK_PREFIX_QA || '[QA]').trim(),
+        // Team Task burn tracking: statuses that count as "in development".
+        burnStatuses: list(env.BURN_STATUSES).length
+          ? list(env.BURN_STATUSES)
+          : ['In Dev', 'In Dev Testing'],
         // Integration Plan: one target-date column per role.
         integrationRoles: list(env.INTEGRATION_ROLES).length
           ? list(env.INTEGRATION_ROLES)

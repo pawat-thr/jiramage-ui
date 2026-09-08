@@ -243,3 +243,16 @@ export function createSubtasks({ parentKey, projectKey, typeId, rows }) {
     },
   })
 }
+
+// Full changelog of one issue (paginated).
+export async function fetchChangelog(key) {
+  const all = []
+  let startAt = 0
+  for (;;) {
+    const page = await jira(`/rest/api/3/issue/${key}/changelog?startAt=${startAt}&maxResults=100`)
+    all.push(...(page.values || []))
+    if (page.isLast || !(page.values || []).length) break
+    startAt += page.values.length
+  }
+  return all
+}

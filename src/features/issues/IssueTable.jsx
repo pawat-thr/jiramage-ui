@@ -4,6 +4,7 @@ import PromptModal from './PromptModal.jsx'
 import { browseUrl } from '../../services/jiraApi.js'
 import { watchPromptTemplate, DEFAULT_PROMPT_TEMPLATE } from '../../services/settingsApi.js'
 import { shortName, groupByType } from '../../utils/format.js'
+import { CFG } from '../../config/appConfig.js'
 import { typeColor } from '../../utils/typeColors.js'
 import { card, emptyState, miniBtn, th, td } from '../../utils/ui.js'
 
@@ -25,6 +26,43 @@ function SpecIcon() {
   )
 }
 
+// Compact burn meter (Jira time-tracking style): bar fills burned/estimate,
+// blue while on track, amber when ≥75% of the estimate, red when over.
+function BurnMeter({ mandays, points }) {
+  const burned = mandays * 8 // 1 manday = 8 points
+  if (!points)
+    return (
+      <div
+        className="text-[11px] whitespace-nowrap text-amber tabular-nums"
+        title={`${mandays.toFixed(1)} manday(s) in dev (Mon–Fri 9:30–18:30) — no estimate to compare, add points in Jira`}
+      >
+        {burned.toFixed(1)} pt · no estimate
+      </div>
+    )
+  const ratio = burned / points
+  const color =
+    ratio > 1 ? 'var(--color-danger)' : ratio >= 0.75 ? 'var(--color-amber)' : 'var(--color-blue)'
+  return (
+    <div
+      className="mt-1.5 w-[104px]"
+      title={`In dev ${mandays.toFixed(1)} manday(s) (Mon–Fri 9:30–18:30, 1d = 8pt): ${burned.toFixed(1)} of ${points} estimated points${ratio > 1 ? ' — OVER estimate' : ''}`}
+    >
+      <div className="flex items-baseline justify-between text-[11px] tabular-nums">
+        <span className="font-semibold" style={{ color }}>
+          {burned.toFixed(1)}
+        </span>
+        <span className="text-muted">/ {points} pt</span>
+      </div>
+      <div className="mt-0.5 h-1.5 overflow-hidden rounded-full bg-field">
+        <div
+          className="h-full rounded-full transition-[width] duration-500"
+          style={{ width: `${Math.min(ratio, 1) * 100}%`, background: color }}
+        />
+      </div>
+    </div>
+  )
+}
+
 const PRIORITY_CLASSES = {
   Highest: 'text-coral font-medium',
   High: 'text-coral',
@@ -33,7 +71,9 @@ const PRIORITY_CLASSES = {
   Lowest: 'text-blue',
 }
 
-export default function IssueTable({ issues, showAssignee, onTransition, onReassign, specLinks = {} }) {
+export default function IssueTable({ issues, showAssignee, onTransition, onReassign, specLinks = {}, burn = null }) {
+  const showBurn = burn !== null
+  const cols = showBurn ? 6 : 5
   // Default template as fallback: if the Firestore watch fails (e.g. rules not
   // republished yet) the ⚡ Prompt popup still generates a usable prompt.
   const [template, setTemplate] = useState(DEFAULT_PROMPT_TEMPLATE)
@@ -60,6 +100,7 @@ export default function IssueTable({ issues, showAssignee, onTransition, onReass
             <th className={th}>Key</th>
             <th className={th}>Summary</th>
             <th className={th}>Status</th>
+            {showBurn && <th className={th}>Burn</th>}
             <th className={th}>{showAssignee ? 'Assignee' : 'Priority'}</th>
             <th className={th} aria-label="actions" />
           </tr>
@@ -67,7 +108,7 @@ export default function IssueTable({ issues, showAssignee, onTransition, onReass
         {groups.map((group) => (
           <tbody key={group.name}>
             <tr className="bg-bg/40">
-              <td colSpan={5} className="border-b border-line px-4 py-2">
+              <td colSpan={cols} className="border-b border-line px-4 py-2">
                 <span
                   className="inline-block rounded-full border px-2.5 py-[2px] text-[11px] font-semibold tracking-[0.05em] uppercase"
                   style={{
@@ -146,6 +187,22 @@ export default function IssueTable({ issues, showAssignee, onTransition, onReass
               <td className={td}>
                 <StatusBadge status={iss.fields.status} />
               </td>
+              {showBurn && (
+                <td className={td}>
+                  {burn[iss.key] ? (
+                    <BurnMeter mandays={burn[iss.key].mandays} points={burn[iss.key].points} />
+                  ) : iss.fields.parent && !Number(iss.fields[CFG.pointField]) ? (
+                    <span
+                      className="inline-block rounded-full border border-amber/40 bg-amber-soft px-2 py-[2px] text-[11px] font-medium whitespace-nowrap text-amber"
+                      title="This subtask has no story-point estimate — add points in Jira so burn can be tracked"
+                    >
+                      no estimate
+                    </span>
+                  ) : (
+                    <span className="text-muted">—</span>
+                  )}
+                </td>
+              )}
               <td className={`${td} text-[13px] whitespace-nowrap`}>
                 {showAssignee ? (
                   <span className="text-muted">

@@ -4,6 +4,7 @@ import RefreshButton from '../components/common/RefreshButton.jsx'
 import Spinner from '../components/common/Spinner.jsx'
 import IssueTable from '../features/issues/IssueTable.jsx'
 import { useSpecLinks } from '../features/issues/useSpecLinks.js'
+import { useBurn } from '../features/issues/useBurn.js'
 import { filterIssues, uniqueSorted, assigneeName, typeName } from '../utils/format.js'
 import { cx, chip, chipOn, searchInput, toolbar } from '../utils/ui.js'
 
@@ -33,6 +34,7 @@ export default function TeamPage({
   const nameOptions = useMemo(() => uniqueSorted((issues || []).map(assigneeName)), [issues])
   const typeOptions = useMemo(() => uniqueSorted((issues || []).map(typeName)), [issues])
   const specLinks = useSpecLinks(visible)
+  const burn = useBurn(visible)
 
   return (
     <>
@@ -63,6 +65,7 @@ export default function TeamPage({
           issues={visible}
           showAssignee
           specLinks={specLinks}
+          burn={burn}
           onTransition={onTransition}
           onReassign={onReassign}
         />
