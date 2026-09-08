@@ -79,7 +79,7 @@ function NavIcon({ name }) {
   )
 }
 
-export default function Sidebar({ items, active, onSelect, collapsed, mobileOpen, onCloseMobile }) {
+export default function Sidebar({ items, active, onSelect, collapsed, mobileOpen, onCloseMobile, brand = APP_NAME }) {
   return (
     <>
       {/* mobile backdrop */}
@@ -101,7 +101,7 @@ export default function Sidebar({ items, active, onSelect, collapsed, mobileOpen
         <div className={cx('flex h-[68px] items-center gap-2.5 border-b border-line', collapsed ? 'md:justify-center md:px-0 px-5' : 'px-5')}>
           <img src="/logo.png" alt="jiramage logo" className="size-8 shrink-0 rounded-lg object-contain" />
           <span className={cx('text-xl font-bold tracking-tight', collapsed && 'md:hidden')}>
-            {APP_NAME}
+            {brand}
             <span className="text-accent">.</span>
           </span>
         </div>

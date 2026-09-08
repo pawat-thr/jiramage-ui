@@ -18,6 +18,8 @@ export default function TeamPage({
   refreshing,
   onTransition,
   onReassign,
+  burnStatuses,
+  burnFinishedStatuses,
 }) {
   const [status, setStatus] = useState('')
   const [type, setType] = useState('')
@@ -34,7 +36,11 @@ export default function TeamPage({
   const nameOptions = useMemo(() => uniqueSorted((issues || []).map(assigneeName)), [issues])
   const typeOptions = useMemo(() => uniqueSorted((issues || []).map(typeName)), [issues])
   const specLinks = useSpecLinks(visible)
-  const burn = useBurn(visible, { finished: true })
+  const burn = useBurn(visible, {
+    finished: true,
+    ...(burnStatuses ? { statuses: burnStatuses } : {}),
+    ...(burnFinishedStatuses ? { finishedStatuses: burnFinishedStatuses } : {}),
+  })
 
   return (
     <>

@@ -48,6 +48,8 @@ export default defineConfig(({ mode }) => {
         jiraUrl: env.JIRA_URL || '',
         email: env.JIRA_EMAIL || '',
         teamEmails: list(env.TEAM_EMAILS),
+        // QA Mode sub-site: the QA team's emails (its dashboard data source).
+        qaEmails: list(env.QA_EMAILS),
         projects: list(env.JIRA_PROJECT, true),
         teamFrom: (env.JIRA_TEAM_FROM || '2024-05-01').trim(),
         refreshMs: parseInterval(env.REFRESH_INTERVAL),
@@ -65,6 +67,14 @@ export default defineConfig(({ mode }) => {
         burnFinishedStatuses: list(env.BURN_FINISHED_STATUSES).length
           ? list(env.BURN_FINISHED_STATUSES)
           : ['PR Review', 'Waiting for deployment', 'Done'],
+        // QA Mode burn: post-QA statuses where the stat shows frozen ("used").
+        qaBurnFinishedStatuses: list(env.QA_BURN_FINISHED_STATUSES).length
+          ? list(env.QA_BURN_FINISHED_STATUSES)
+          : ['Done'],
+        // QA Mode burn: the status QA subtasks work under.
+        qaBurnStatuses: list(env.QA_BURN_STATUSES).length
+          ? list(env.QA_BURN_STATUSES)
+          : ['In Progress'],
         // Team Task burn tracking: statuses that count as "in development".
         burnStatuses: list(env.BURN_STATUSES).length
           ? list(env.BURN_STATUSES)
@@ -82,7 +92,9 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       proxy: {
-        '/jira': {
+        // ^/jira/ (regex): only real API calls — NOT the /jiramage/qa sub-site,
+        // whose path also happens to start with "/jira".
+        '^/jira/': {
           target: env.JIRA_URL,
           changeOrigin: true,
           rewrite: (p) => p.replace(/^\/jira/, ''),

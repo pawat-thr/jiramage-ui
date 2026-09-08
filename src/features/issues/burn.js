@@ -39,18 +39,18 @@ export function workingMandays(startISO, end = new Date()) {
   return hours / HOURS_PER_DAY
 }
 
-export const isBurnStatus = (name) =>
-  CFG.burnStatuses.some((s) => s.toLowerCase() === (name || '').toLowerCase())
+export const isBurnStatus = (name, statuses = CFG.burnStatuses) =>
+  statuses.some((s) => s.toLowerCase() === (name || '').toLowerCase())
 
 // Post-dev statuses where the burn stat is shown FROZEN (what was used).
-export const isFinishedStatus = (name) =>
-  CFG.burnFinishedStatuses.some((s) => s.toLowerCase() === (name || '').toLowerCase())
+export const isFinishedStatus = (name, statuses = CFG.burnFinishedStatuses) =>
+  statuses.some((s) => s.toLowerCase() === (name || '').toLowerCase())
 
 // All [enter, leave] periods the card spent in a burn status, from the
 // changelog. Leaving dev CLOSES an interval; coming back OPENS a new one, so
 // burn pauses while the card sits elsewhere and continues on re-entry.
 // The last interval is open (end: null) when the card is still in dev.
-export function burnIntervals(changelogValues) {
+export function burnIntervals(changelogValues, statuses = CFG.burnStatuses) {
   const statusChanges = []
   for (const h of changelogValues || []) {
     for (const item of h.items || []) {
@@ -61,7 +61,7 @@ export function burnIntervals(changelogValues) {
   const intervals = []
   let open = null
   for (const c of statusChanges) {
-    if (isBurnStatus(c.to)) {
+    if (isBurnStatus(c.to, statuses)) {
       if (!open) open = c.at
     } else if (open) {
       intervals.push([open, c.at])

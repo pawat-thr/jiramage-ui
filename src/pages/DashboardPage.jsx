@@ -11,13 +11,13 @@ import { useBurn } from '../features/issues/useBurn.js'
 import { CFG } from '../config/appConfig.js'
 import { chip, toolbar } from '../utils/ui.js'
 
-export default function DashboardPage({ teamIssues, myIssues, onRefresh, refreshing, onPickMember }) {
-  const members = useMemo(() => memberStats(teamIssues || []), [teamIssues])
+export default function DashboardPage({ teamIssues, myIssues, onRefresh, refreshing, onPickMember, memberEmails, burnStatuses }) {
+  const members = useMemo(() => memberStats(teamIssues || [], memberEmails), [teamIssues, memberEmails])
   const statuses = useMemo(() => statusStats(teamIssues || []), [teamIssues])
   const types = useMemo(() => typeStats(teamIssues || []), [teamIssues])
-  const subtaskRows = useMemo(() => activeSubtaskPoints(teamIssues || []), [teamIssues])
+  const subtaskRows = useMemo(() => activeSubtaskPoints(teamIssues || [], memberEmails), [teamIssues, memberEmails])
   // Per-member dev burn: sum burned vs estimated points of their in-dev cards.
-  const burn = useBurn(teamIssues || [])
+  const burn = useBurn(teamIssues || [], burnStatuses ? { statuses: burnStatuses } : {})
   const memberBurn = useMemo(() => {
     const map = {}
     for (const iss of teamIssues || []) {

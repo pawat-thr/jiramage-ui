@@ -12,7 +12,7 @@ export const CATEGORIES = [
 
 // Per-member counts by status category. Every configured member (me included)
 // is seeded so people with zero tasks still appear on the chart.
-export function memberStats(issues) {
+export function memberStats(issues, emails = [CFG.email, ...CFG.teamEmails]) {
   const byKey = new Map()
   const seed = (key, name, isMe) =>
     byKey.set(key, {
@@ -24,8 +24,7 @@ export function memberStats(issues) {
       total: 0,
     })
 
-  seed(CFG.email, emailUsername(CFG.email), true)
-  CFG.teamEmails.forEach((e) => seed(e, emailUsername(e), false))
+  emails.forEach((e) => seed(e, emailUsername(e), e === CFG.email))
 
   for (const iss of issues) {
     const a = iss.fields.assignee
@@ -73,11 +72,10 @@ export function typeStats(issues) {
 
 // Active (not done) SUBTASKS per member, with story-point sums. Every
 // configured member is seeded so everyone shows even at zero.
-export function activeSubtaskPoints(issues) {
+export function activeSubtaskPoints(issues, emails = [CFG.email, ...CFG.teamEmails]) {
   const byKey = new Map()
   const seed = (key, name, isMe) => byKey.set(key, { key, name, isMe, count: 0, points: 0 })
-  seed(CFG.email, emailUsername(CFG.email), true)
-  CFG.teamEmails.forEach((e) => seed(e, emailUsername(e), false))
+  emails.forEach((e) => seed(e, emailUsername(e), e === CFG.email))
 
   for (const iss of issues) {
     if ((iss.fields.issuetype?.hierarchyLevel ?? 0) >= 0) continue // subtasks only

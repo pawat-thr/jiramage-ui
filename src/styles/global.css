@@ -221,3 +221,15 @@
     @apply outline-2 outline-offset-2 outline-accent;
   }
 }
+
+/* ---- QA Mode sub-site: same theme, accent swapped red → blue ---- */
+[data-mode='qa'] {
+  --c-accent: #2f7fd6;
+  --c-accent-bright: #1f66b8;
+  --c-accent-soft: #e6f0fb;
+}
+:root[data-theme='dark'][data-mode='qa'] {
+  --c-accent: #4f9cef;
+  --c-accent-bright: #79b8f7;
+  --c-accent-soft: #14293d;
+}

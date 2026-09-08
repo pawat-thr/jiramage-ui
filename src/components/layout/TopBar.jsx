@@ -15,7 +15,7 @@ function IconButton({ label, onClick, children, className = '' }) {
   )
 }
 
-export default function TopBar({ title, updatedAt, user, onLogout, onToggleCollapse, onToggleMobile }) {
+export default function TopBar({ title, updatedAt, user, onLogout, onToggleCollapse, onToggleMobile, mode = 'main', onSwitchMode }) {
   return (
     <header className="sticky top-0 z-20 flex min-h-[68px] items-center gap-3 border-b border-line bg-bg/92 px-4 py-3 backdrop-blur-md md:px-6">
       {/* mobile: open drawer */}
@@ -49,6 +49,15 @@ export default function TopBar({ title, updatedAt, user, onLogout, onToggleColla
           {updatedAt && <>updated {updatedAt.toLocaleTimeString()} · </>}
           auto-refresh {Math.round(CFG.refreshMs / 60000)}m
         </span>
+        {onSwitchMode && (
+          <button
+            onClick={onSwitchMode}
+            title={mode === 'main' ? 'Open the QA sub-site' : 'Back to the main site'}
+            className="rounded-full border border-line bg-panel px-3.5 py-1.5 text-xs font-semibold text-ink-soft transition-colors hover:border-accent hover:text-accent-bright"
+          >
+            {mode === 'main' ? 'QA Mode' : '← Main'}
+          </button>
+        )}
         {firebaseEnabled && user?.uid && <NotificationBell user={user} />}
         {user && (
           <span className="flex items-center gap-2 border-l border-line pl-3">

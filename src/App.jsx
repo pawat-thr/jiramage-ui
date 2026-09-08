@@ -23,6 +23,7 @@ import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts.js'
 import { useAuth } from './hooks/useAuth.js'
 import { usePrefs } from './hooks/usePrefs.js'
 import { firebaseEnabled } from './services/firebase.js'
+import QaApp, { QA_BASE } from './qa/QaApp.jsx'
 
 // PR Review needs Firebase (multi-user Firestore); it only appears in team mode.
 const NAV_ITEMS = [
@@ -59,6 +60,8 @@ export default function App() {
     return <LoginPage auth={auth} />
   }
   if (atLogin) return <Navigate to="/" replace />
+  if (location.pathname.startsWith(QA_BASE))
+    return <QaApp user={auth.user} onLogout={auth.configured ? auth.logout : null} />
   return <AppShell user={auth.user} onLogout={auth.configured ? auth.logout : null} />
 }
 
@@ -147,6 +150,8 @@ function AppShell({ user, onLogout }) {
           onLogout={onLogout}
           onToggleCollapse={() => setCollapsed((v) => !v)}
           onToggleMobile={() => setMobileOpen(true)}
+          mode="main"
+          onSwitchMode={() => navigate(QA_BASE)}
         />
 
         <main className="flex-1 p-4 md:p-6">
