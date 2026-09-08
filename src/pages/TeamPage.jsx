@@ -34,7 +34,7 @@ export default function TeamPage({
   const nameOptions = useMemo(() => uniqueSorted((issues || []).map(assigneeName)), [issues])
   const typeOptions = useMemo(() => uniqueSorted((issues || []).map(typeName)), [issues])
   const specLinks = useSpecLinks(visible)
-  const burn = useBurn(visible)
+  const burn = useBurn(visible, { finished: true })
 
   return (
     <>

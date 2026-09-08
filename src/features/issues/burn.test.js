@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { workingMandays, firstBurnStart, isBurnStatus } from './burn.js'
+import { workingMandays, burnIntervals, intervalMandays, isBurnStatus } from './burn.js'
 
 // 2026-09-07 is a Monday
 const D = (s) => new Date(s)
@@ -35,20 +35,37 @@ describe('workingMandays', () => {
   })
 })
 
-describe('firstBurnStart / isBurnStatus', () => {
-  const log = [
-    { created: '2026-09-04T12:12:04', items: [{ field: 'status', toString: 'In Dev Testing' }] },
-    { created: '2026-09-03T16:52:04', items: [{ field: 'status', toString: 'In Dev' }] },
-    { created: '2026-09-01T10:00:00', items: [{ field: 'status', toString: 'To Do' }] },
-    { created: '2026-09-02T10:00:00', items: [{ field: 'assignee', toString: 'In Dev' }] }, // not a status change
-  ]
-
-  it('finds the earliest transition into any burn status', () => {
-    expect(firstBurnStart(log)).toBe('2026-09-03T16:52:04')
+describe('burnIntervals / isBurnStatus', () => {
+  it('pauses on leaving dev and continues on re-entry (open tail)', () => {
+    const log = [
+      { created: '2026-09-01T10:00:00', items: [{ field: 'status', toString: 'In Dev' }] },
+      { created: '2026-09-02T10:00:00', items: [{ field: 'status', toString: 'PR Review' }] },
+      { created: '2026-09-03T10:00:00', items: [{ field: 'status', toString: 'In Dev Testing' }] },
+      { created: '2026-09-02T12:00:00', items: [{ field: 'assignee', toString: 'In Dev' }] }, // not a status change
+    ]
+    expect(burnIntervals(log)).toEqual([
+      ['2026-09-01T10:00:00', '2026-09-02T10:00:00'],
+      ['2026-09-03T10:00:00', null],
+    ])
   })
 
-  it('returns null when the card never entered a burn status', () => {
-    expect(firstBurnStart([{ created: 'x', items: [{ field: 'status', toString: 'Done' }] }])).toBeNull()
+  it('closed intervals only for finished cards; empty when never in dev', () => {
+    const done = [
+      { created: '2026-09-01T10:00:00', items: [{ field: 'status', toString: 'In Dev' }] },
+      { created: '2026-09-01T15:00:00', items: [{ field: 'status', toString: 'Done' }] },
+    ]
+    expect(burnIntervals(done)).toEqual([['2026-09-01T10:00:00', '2026-09-01T15:00:00']])
+    expect(burnIntervals([{ created: 'x', items: [{ field: 'status', toString: 'Done' }] }])).toEqual([])
+  })
+
+  it('intervalMandays sums closed intervals and runs the open one to now', () => {
+    // Mon 9:30-12:00 closed (2.5h) + open from Tue 13:00 to Tue 15:00 "now" (2h) = 4.5h
+    const now = new Date('2026-09-08T15:00:00')
+    const m = intervalMandays([
+      ['2026-09-07T09:30:00', '2026-09-07T12:00:00'],
+      ['2026-09-08T13:00:00', null],
+    ], now)
+    expect(m).toBeCloseTo(4.5 / 8, 5)
   })
 
   it('status match is case-insensitive', () => {

@@ -61,6 +61,10 @@ export default defineConfig(({ mode }) => {
         subtaskPrefixBe: (env.SUBTASK_PREFIX_BE || env.SUBTASK_PREFIX || '').trim(),
         subtaskPrefixFe: (env.SUBTASK_PREFIX_FE || '[FE]').trim(),
         subtaskPrefixQa: (env.SUBTASK_PREFIX_QA || '[QA]').trim(),
+        // Burn: statuses AFTER dev where the final burn stat is shown frozen.
+        burnFinishedStatuses: list(env.BURN_FINISHED_STATUSES).length
+          ? list(env.BURN_FINISHED_STATUSES)
+          : ['PR Review', 'Waiting for deployment', 'Done'],
         // Team Task burn tracking: statuses that count as "in development".
         burnStatuses: list(env.BURN_STATUSES).length
           ? list(env.BURN_STATUSES)

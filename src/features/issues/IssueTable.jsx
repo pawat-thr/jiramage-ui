@@ -28,32 +28,45 @@ function SpecIcon() {
 
 // Compact burn meter (Jira time-tracking style): bar fills burned/estimate,
 // blue while on track, amber when ≥75% of the estimate, red when over.
-function BurnMeter({ mandays, points }) {
+function BurnMeter({ mandays, points, finished = false }) {
   const burned = mandays * 8 // 1 manday = 8 points
+  const windows = 'Mon–Fri 9:30–12:00 & 13:00–18:30, 1d = 8pt'
   if (!points)
     return (
       <div
-        className="text-[11px] whitespace-nowrap text-amber tabular-nums"
-        title={`${mandays.toFixed(1)} manday(s) in dev (Mon–Fri 9:30–12:00 & 13:00–18:30) — no estimate to compare, add points in Jira`}
+        className={`text-[11px] whitespace-nowrap tabular-nums ${finished ? 'text-muted' : 'text-amber'}`}
+        title={`${mandays.toFixed(1)} manday(s) in dev (${windows}) — no estimate to compare`}
       >
-        {burned.toFixed(1)} pt · no estimate
+        {burned.toFixed(1)} pt {finished ? 'used' : '· no estimate'}
       </div>
     )
   const ratio = burned / points
-  const color =
-    ratio > 1 ? 'var(--color-danger)' : ratio >= 0.75 ? 'var(--color-amber)' : 'var(--color-blue)'
+  const color = finished
+    ? ratio > 1
+      ? 'var(--color-danger)'
+      : 'var(--color-success)'
+    : ratio > 1
+      ? 'var(--color-danger)'
+      : ratio >= 0.75
+        ? 'var(--color-amber)'
+        : 'var(--color-blue)'
   return (
     <div
-      className="mt-1.5 w-[104px]"
-      title={`In dev ${mandays.toFixed(1)} manday(s) (Mon–Fri 9:30–12:00 & 13:00–18:30, 1d = 8pt): ${burned.toFixed(1)} of ${points} estimated points${ratio > 1 ? ' — OVER estimate' : ''}`}
+      className="w-[110px]"
+      title={
+        finished
+          ? `Finished: used ${burned.toFixed(1)} of ${points} estimated points in dev (${windows})${ratio > 1 ? ' — went OVER estimate' : ''}`
+          : `In dev ${mandays.toFixed(1)} manday(s) (${windows}): ${burned.toFixed(1)} of ${points} estimated points${ratio > 1 ? ' — OVER estimate' : ''}`
+      }
     >
       <div className="flex items-baseline justify-between text-[11px] tabular-nums">
         <span className="font-semibold" style={{ color }}>
+          {finished && <span className="mr-0.5 font-normal text-muted">used </span>}
           {burned.toFixed(1)}
         </span>
         <span className="text-muted">/ {points} pt</span>
       </div>
-      <div className="mt-0.5 h-1.5 overflow-hidden rounded-full bg-field">
+      <div className={`mt-0.5 h-1.5 overflow-hidden rounded-full bg-field ${finished ? 'opacity-70' : ''}`}>
         <div
           className="h-full rounded-full transition-[width] duration-500"
           style={{ width: `${Math.min(ratio, 1) * 100}%`, background: color }}
@@ -190,7 +203,7 @@ export default function IssueTable({ issues, showAssignee, onTransition, onReass
               {showBurn && (
                 <td className={td}>
                   {burn[iss.key] ? (
-                    <BurnMeter mandays={burn[iss.key].mandays} points={burn[iss.key].points} />
+                    <BurnMeter mandays={burn[iss.key].mandays} points={burn[iss.key].points} finished={burn[iss.key].finished} />
                   ) : iss.fields.parent && !Number(iss.fields[CFG.pointField]) ? (
                     <span
                       className="inline-block rounded-full border border-amber/40 bg-amber-soft px-2 py-[2px] text-[11px] font-medium whitespace-nowrap text-amber"
