@@ -14,6 +14,7 @@ import PrBoardPage from './pages/PrBoardPage.jsx'
 import InboxPage from './pages/InboxPage.jsx'
 import IntegrationPage from './pages/IntegrationPage.jsx'
 import SubtaskGenPage from './pages/SubtaskGenPage.jsx'
+import QaCapacityPage from './qa/QaCapacityPage.jsx'
 import SettingsPage from './pages/SettingsPage.jsx'
 import LoginPage from './pages/LoginPage.jsx'
 import Spinner from './components/common/Spinner.jsx'
@@ -23,7 +24,12 @@ import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts.js'
 import { useAuth } from './hooks/useAuth.js'
 import { usePrefs } from './hooks/usePrefs.js'
 import { firebaseEnabled } from './services/firebase.js'
+import { fetchTeamIssues } from './services/jiraApi.js'
+import { CFG } from './config/appConfig.js'
 import QaApp, { QA_BASE } from './qa/QaApp.jsx'
+
+// Main-mode Capacity Planner plans for the whole dev team (me + TEAM_EMAILS).
+const TEAM_PLAN_EMAILS = [...new Set([CFG.email, ...CFG.teamEmails].filter(Boolean))]
 
 // PR Review needs Firebase (multi-user Firestore); it only appears in team mode.
 const NAV_ITEMS = [
@@ -32,6 +38,7 @@ const NAV_ITEMS = [
   { id: 'team', label: 'Team Task', path: '/team-task' },
   { id: 'delivery', label: 'Delivery Tracking (beta)', path: '/delivery' },
   { id: 'gen', label: 'Spec Wizard (beta)', path: '/subtask-gen' },
+  { id: 'capacity', label: 'Capacity Planner (beta)', path: '/capacity' },
   ...(firebaseEnabled
     ? [
         { id: 'board', label: 'Team Board', path: '/team-board' },
@@ -203,6 +210,15 @@ function AppShell({ user, onLogout }) {
             />
           )}
           {tab === 'gen' && <SubtaskGenPage onNotify={showToast} />}
+          {tab === 'capacity' && (
+            <QaCapacityPage
+              onNotify={showToast}
+              emails={TEAM_PLAN_EMAILS}
+              fetchIssues={fetchTeamIssues}
+              teamLabel="member"
+              envVar="TEAM_EMAILS"
+            />
+          )}
           {tab === 'board' && <TeamBoardPage user={user} onNotify={showToast} />}
           {tab === 'pr' && <PrBoardPage user={user} onNotify={showToast} />}
           {tab === 'integration' && (

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import ModalShell from '../components/common/ModalShell.jsx'
 import Spinner from '../components/common/Spinner.jsx'
-import { fetchQaIssues, browseUrl } from '../services/jiraApi.js'
+import FilterMenu from '../components/common/FilterMenu.jsx'
+import { fetchQaIssues, fetchUnassignedIssues, fetchStories, assignIssue, browseUrl, resolveAccountIds } from '../services/jiraApi.js'
 import { loadPlans, savePlan } from '../services/qaPlanApi.js'
 import { firebaseEnabled } from '../services/firebase.js'
 import {
@@ -19,7 +20,8 @@ import {
   reflowFrom,
 } from './capacity.js'
 import { CFG } from '../config/appConfig.js'
-import { emailUsername } from '../utils/format.js'
+import { emailUsername, uniqueSorted } from '../utils/format.js'
+import { releaseNames } from '../features/story/releaseNames.js'
 import { avatarColor, initials } from '../features/pr/prConstants.js'
 import { card, cx } from '../utils/ui.js'
 
@@ -43,7 +45,16 @@ function Avatar({ email, size = 'size-6', text = 'text-[10px]' }) {
   )
 }
 
-export default function QaCapacityPage({ onNotify }) {
+// Used by both modes: QA Mode with the defaults, main mode with the dev team
+// (emails + fetchIssues + labels passed in). Plans live in the same `qaPlan`
+// collection either way — docs are keyed per email, so the modes can't collide.
+export default function QaCapacityPage({
+  onNotify,
+  emails = CFG.qaEmails,
+  fetchIssues = fetchQaIssues,
+  teamLabel = 'QA',
+  envVar = 'QA_EMAILS',
+}) {
   const today = dateKey(new Date())
   const [mKey, setMKey] = useState(monthKey(new Date()))
   const days = useMemo(() => monthDays(mKey), [mKey])
@@ -59,14 +70,32 @@ export default function QaCapacityPage({ onNotify }) {
   const [hoverTask, setHoverTask] = useState(null)
   const [dockOpen, setDockOpen] = useState(true)
   const [capOpen, setCapOpen] = useState(true)
+  const [showUnassigned, setShowUnassigned] = useState(false)
+  const [release, setRelease] = useState('')
+  const [storyReleases, setStoryReleases] = useState({}) // storyKey -> [release names]
+  const [emailToId, setEmailToId] = useState({}) // member email -> Jira accountId (for assign-on-drop)
 
   useEffect(() => {
     let on = true
-    fetchQaIssues()
-      .then((issues) => {
+    // accountId → email fallback: Atlassian privacy settings can hide a user's
+    // emailAddress in API responses even though JQL matched it — without this,
+    // their subtasks would wrongly show as "no assignee".
+    Promise.all([fetchIssues(), fetchUnassignedIssues(), resolveAccountIds(emails), fetchStories()])
+      .then(([assigned, unassigned, ids, stories]) => {
         if (!on) return
+        setEmailToId(ids)
+        setStoryReleases(Object.fromEntries(stories.map((st) => [st.key, releaseNames(st)])))
+        const idToEmail = Object.fromEntries(
+          Object.entries(ids).filter(([, id]) => id).map(([e, id]) => [id, e]),
+        )
+        // team's issues + fresh unassigned subtasks (grooming output, see below)
+        const issues = [...assigned, ...unassigned]
         const map = {}
         for (const i of issues) {
+          // SUBTASKS ONLY: stories/bugs with points must not appear as plannable
+          // work (a story's points duplicate its subtasks'). Story names still
+          // show — group headers read them from each subtask's parent field.
+          if (!i.fields.parent) continue
           const pts = Number(i.fields[CFG.pointField]) || 0
           if (!pts) continue
           map[i.key] = {
@@ -75,7 +104,7 @@ export default function QaCapacityPage({ onNotify }) {
             points: pts,
             status: i.fields.status?.name || '',
             statusCategory: i.fields.status?.statusCategory?.key || 'new',
-            assignee: i.fields.assignee?.emailAddress || '',
+            assignee: i.fields.assignee?.emailAddress || idToEmail[i.fields.assignee?.accountId] || '',
             storyKey: i.fields.parent?.key || null,
             storySummary: i.fields.parent?.fields?.summary || null,
           }
@@ -91,12 +120,12 @@ export default function QaCapacityPage({ onNotify }) {
   useEffect(() => {
     let on = true
     setPlans(null)
-    const empty = () => Object.fromEntries(CFG.qaEmails.map((e) => [e, { capacity: {}, days: {} }]))
+    const empty = () => Object.fromEntries(emails.map((e) => [e, { capacity: {}, days: {} }]))
     if (!firebaseEnabled) {
       setPlans(empty())
       return
     }
-    loadPlans(CFG.qaEmails, mKey)
+    loadPlans(emails, mKey)
       .then((p) => on && setPlans(p))
       .catch((err) => {
         if (!on) return
@@ -136,9 +165,10 @@ export default function QaCapacityPage({ onNotify }) {
     const q = search.trim().toLowerCase()
     const keys = Object.keys(taskCells).filter((k) => {
       if (memberFilter && ![...(taskOwners[k] || [])].includes(memberFilter)) return false
-      if (!q) return true
       const t = tasks[k]
-      return k.toLowerCase().includes(q) || (t?.summary || '').toLowerCase().includes(q)
+      if (release && !(storyReleases[t?.storyKey] || []).includes(release)) return false
+      if (!q) return true
+      return [k, t?.summary, t?.storyKey, t?.storySummary].some((v) => (v || '').toLowerCase().includes(q))
     })
     const byStory = new Map()
     for (const k of keys) {
@@ -152,7 +182,7 @@ export default function QaCapacityPage({ onNotify }) {
     return [...byStory.values()]
       .map((g) => ({ ...g, rows: g.rows.sort() }))
       .sort((a, b) => a.storyKey.localeCompare(b.storyKey, undefined, { numeric: true }))
-  }, [tasks, taskCells, taskOwners, memberFilter, search])
+  }, [tasks, taskCells, taskOwners, memberFilter, search, release, storyReleases])
 
   // unplanned dock (bottom, frozen)
   const dock = useMemo(() => {
@@ -163,15 +193,22 @@ export default function QaCapacityPage({ onNotify }) {
       .map((t) => ({ ...t, left: t.points - (allocated[t.key] || 0) }))
       .filter((t) => t.left > 0)
       .filter((t) => !memberFilter || t.assignee === memberFilter)
-      .filter((t) => !q || t.key.toLowerCase().includes(q) || t.summary.toLowerCase().includes(q))
+      .filter((t) => !release || (storyReleases[t.storyKey] || []).includes(release))
+      .filter((t) => !q || [t.key, t.summary, t.storyKey, t.storySummary].some((v) => (v || '').toLowerCase().includes(q)))
       .sort((a, b) => b.left - a.left)
-  }, [tasks, allocated, memberFilter, search])
+  }, [tasks, allocated, memberFilter, search, release, storyReleases])
+
+  const unassignedCount = useMemo(() => dock.filter((t) => !t.assignee).length, [dock])
+  const dockShown = useMemo(
+    () => (showUnassigned ? dock : dock.filter((t) => t.assignee)),
+    [dock, showUnassigned],
+  )
 
   // dock grouped per parent STORY (planning is story-first): each group lists
-  // its unplanned subtasks with their QA, matching the main table's grouping
+  // its unplanned subtasks with their assignee, matching the main table's grouping
   const dockGroups = useMemo(() => {
     const by = new Map()
-    for (const t of dock) {
+    for (const t of dockShown) {
       const sk = t.storyKey || t.key
       if (!by.has(sk)) {
         by.set(sk, { storyKey: sk, storySummary: t.storySummary || (t.storyKey ? '' : t.summary) || '', tasks: [] })
@@ -179,10 +216,16 @@ export default function QaCapacityPage({ onNotify }) {
       by.get(sk).tasks.push(t)
     }
     return [...by.values()].sort((a, b) => a.storyKey.localeCompare(b.storyKey, undefined, { numeric: true }))
-  }, [dock])
+  }, [dockShown])
 
-  const allCapEmails = memberFilter ? [memberFilter] : CFG.qaEmails
-  // collapsed strip: only QAs that have anything planned this month (still droppable via expand)
+  const releaseOptions = useMemo(() => {
+    if (!tasks) return []
+    const keys = new Set(Object.values(tasks).map((t) => t.storyKey).filter(Boolean))
+    return uniqueSorted([...keys].flatMap((k) => storyReleases[k] || []))
+  }, [tasks, storyReleases])
+
+  const allCapEmails = memberFilter ? [memberFilter] : emails
+  // collapsed strip: only members with anything planned this month (expand to drop on the rest)
   const capEmails = capOpen
     ? allCapEmails
     : allCapEmails.filter((e) => Object.keys(plans?.[e]?.days || {}).length > 0)
@@ -194,30 +237,45 @@ export default function QaCapacityPage({ onNotify }) {
   const startFrom = mKey === today.slice(0, 7) ? today : days[0]
 
   const planTask = (task, email, fromDay) => {
-    if (!CFG.qaEmails.includes(email)) {
-      onNotify(`${task.key} has no QA assignee — drop it on a QA's capacity row instead`, true)
+    if (!emails.includes(email)) {
+      onNotify(`${task.key} has no ${teamLabel} assignee — drop it on a member's capacity row instead`, true)
       return
     }
     const { plan, unplaced } = autoPlace(plans[email], task.key, task.left ?? task.points, fromDay, {
       untilDay: monthEnd,
     })
     persist(email, plan)
-    onNotify(
+    const planMsg =
       unplaced > 0
         ? `Planned ${task.key} for ${emailUsername(email)} — ${unplaced} pt didn't fit this month`
-        : `✓ Planned ${task.key} (${task.left ?? task.points} pt) → ${emailUsername(email)}`,
-      unplaced > 0,
-    )
+        : `✓ Planned ${task.key} (${task.left ?? task.points} pt) → ${emailUsername(email)}`
+    // grooming flow: dropping an UNASSIGNED subtask on someone's row is the
+    // "assign by effort" gesture — set the Jira assignee too
+    if (!task.assignee && emailToId[email]) {
+      assignIssue(task.key, emailToId[email])
+        .then(() => {
+          setTasks((m) => ({ ...m, [task.key]: { ...m[task.key], assignee: email } }))
+          onNotify(`${planMsg} · assigned in Jira`, unplaced > 0)
+        })
+        .catch((err) => onNotify(`${planMsg} — but Jira assign FAILED: ${err.message}`, true))
+      return
+    }
+    if (!task.assignee) {
+      // accountId lookup failed for this member — plan saved, but be honest
+      onNotify(`${planMsg} — couldn't resolve the Jira account, assign ${task.key} manually`, true)
+      return
+    }
+    onNotify(planMsg, unplaced > 0)
   }
 
-  // plan a whole story's unplanned subtasks in one go — each for its own QA.
-  // Fold autoPlace over a local plan per QA so each task sees the previous
-  // one's allocations, persist once per QA.
+  // plan a whole story's unplanned subtasks in one go — each for its own
+  // assignee. Fold autoPlace over a local plan per member so each task sees
+  // the previous one's allocations, persist once per member.
   const planAll = (groupTasks) => {
     const byEmail = new Map()
     let skipped = 0
     for (const t of groupTasks) {
-      if (!CFG.qaEmails.includes(t.assignee)) {
+      if (!emails.includes(t.assignee)) {
         skipped++
         continue
       }
@@ -238,10 +296,10 @@ export default function QaCapacityPage({ onNotify }) {
     }
     const extras = [
       spill > 0 && `${spill} pt didn't fit this month`,
-      skipped > 0 && `${skipped} without a QA skipped — drop those on a capacity row`,
+      skipped > 0 && `${skipped} without a ${teamLabel} skipped — drop those on a capacity row`,
     ].filter(Boolean)
     onNotify(
-      `${spill > 0 ? '' : '✓ '}Planned ${count} subtasks for their QAs${extras.length ? ` — ${extras.join(' · ')}` : ''}`,
+      `${spill > 0 ? '' : '✓ '}Planned ${count} subtasks for their assignees${extras.length ? ` — ${extras.join(' · ')}` : ''}`,
       spill > 0 || skipped > 0,
     )
   }
@@ -263,15 +321,15 @@ export default function QaCapacityPage({ onNotify }) {
     )
   }
 
-  if (!CFG.qaEmails.length)
+  if (!emails.length)
     return (
       <div className={card}>
         <div className="px-4 py-12 text-center text-muted">
-          No QA team configured — add <code className="text-accent-bright">QA_EMAILS</code> to .env.
+          No team configured — add <code className="text-accent-bright">{envVar}</code> to .env.
         </div>
       </div>
     )
-  if (tasks === null || plans === null) return <Spinner label="Loading QA plan…" />
+  if (tasks === null || plans === null) return <Spinner label="Loading capacity plan…" />
 
   const [yy, mm] = mKey.split('-').map(Number)
 
@@ -292,15 +350,16 @@ export default function QaCapacityPage({ onNotify }) {
           value={memberFilter}
           onChange={(e) => setMemberFilter(e.target.value)}
         >
-          <option value="">All QA ({CFG.qaEmails.length})</option>
-          {CFG.qaEmails.map((e) => (
+          <option value="">All {teamLabel} ({emails.length})</option>
+          {emails.map((e) => (
             <option key={e} value={e}>{emailUsername(e)}</option>
           ))}
         </select>
+        <FilterMenu label="Release" value={release} options={releaseOptions} onPick={setRelease} />
         <input
           type="search"
           className="w-52 rounded-full border border-line bg-field px-3.5 py-1.5 text-[13px] text-ink placeholder:text-muted focus:border-accent"
-          placeholder="Search task key or title…"
+          placeholder="Search task or story…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
@@ -329,10 +388,10 @@ export default function QaCapacityPage({ onNotify }) {
                   Task / Capacity
                   <button
                     className="rounded-full border border-line bg-field px-2 py-0.5 text-[10px] font-medium normal-case text-ink-soft hover:border-accent hover:text-accent-bright"
-                    title={capOpen ? 'Collapse the capacity strip to only QAs with a plan' : 'Show all QA capacity rows'}
+                    title={capOpen ? 'Collapse the capacity strip to only people with a plan' : 'Show all capacity rows'}
                     onClick={() => setCapOpen((v) => !v)}
                   >
-                    {capOpen ? `all QA ▴` : `${capEmails.length}/${allCapEmails.length} QA ▾`}
+                    {capOpen ? `all ${teamLabel} ▴` : `${capEmails.length}/${allCapEmails.length} ${teamLabel} ▾`}
                   </button>
                 </span>
               </th>
@@ -450,17 +509,37 @@ export default function QaCapacityPage({ onNotify }) {
       {/* frozen dock: unplanned tasks pinned to the bottom of the viewport (sticky = aligns with the content column) */}
       <div className="sticky bottom-3 z-30">
         <div className="rounded-2xl border border-line bg-panel/95 shadow-lift backdrop-blur">
-          <button className="flex w-full items-center justify-between px-4 py-2 text-left" onClick={() => setDockOpen((v) => !v)}>
+          <div
+            className="flex w-full cursor-pointer flex-wrap items-center justify-between gap-2 px-4 py-2 text-left select-none"
+            onClick={() => setDockOpen((v) => !v)}
+          >
             <span className="text-[14px] font-semibold">
-              Unplanned <span className="text-muted">({dock.length} tasks · {dock.reduce((a, t) => a + t.left, 0)} pt)</span>
+              Unplanned <span className="text-muted">({dockShown.length} tasks · {dockShown.reduce((a, t) => a + t.left, 0)} pt)</span>
             </span>
-            <span className="text-[13px] text-muted">
-              drag onto a capacity cell to plan · ⚡ = auto-plan for its QA · {dockOpen ? 'hide ▾' : 'show ▴'}
+            <span className="flex items-center gap-2 text-[13px] text-muted">
+              {unassignedCount > 0 && (
+                <button
+                  className={cx(
+                    'rounded-full border px-2.5 py-0.5 text-[12px]',
+                    showUnassigned
+                      ? 'border-amber/50 bg-amber-soft font-medium text-amber'
+                      : 'border-line bg-field text-muted hover:text-ink',
+                  )}
+                  title="Fresh from grooming: subtasks nobody is assigned to yet. Drop one on a member's capacity row to assign it in Jira AND plan it."
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setShowUnassigned((v) => !v)
+                  }}
+                >
+                  unassigned ({unassignedCount}) {showUnassigned ? '▾' : '▴'}
+                </button>
+              )}
+              <span>drag onto a capacity cell to plan · ⚡ = auto-plan for its assignee · {dockOpen ? 'hide ▾' : 'show ▴'}</span>
             </span>
-          </button>
+          </div>
           {dockOpen && (
             <div className="max-h-[45vh] overflow-y-auto border-t border-line px-4 py-3">
-              {dock.length === 0 && <span className="text-[13px] text-muted">Everything with points is planned. ✓</span>}
+              {dockShown.length === 0 && <span className="text-[13px] text-muted">Everything with points is planned. ✓</span>}
               {dockGroups.map((g) => (
                 <div key={g.storyKey} className="mb-3 last:mb-0">
                   <div className="mb-1.5 flex items-center gap-2">
@@ -471,10 +550,10 @@ export default function QaCapacityPage({ onNotify }) {
                     <span className="shrink-0 text-[12px] text-muted tabular-nums">
                       {g.tasks.length} subtask{g.tasks.length === 1 ? '' : 's'} · {g.tasks.reduce((a, t) => a + t.left, 0)} pt
                     </span>
-                    {g.tasks.some((t) => CFG.qaEmails.includes(t.assignee)) && (
+                    {g.tasks.some((t) => emails.includes(t.assignee)) && (
                       <button
                         className="shrink-0 rounded-full border border-line bg-field px-2.5 py-0.5 text-[11px] text-ink-soft hover:border-accent hover:text-accent-bright"
-                        title="Auto-plan every subtask of this story for its own QA, from today"
+                        title="Auto-plan every subtask of this story for its own assignee, from today"
                         onClick={() => planAll(g.tasks)}
                       >
                         ⚡ Plan all
@@ -499,12 +578,12 @@ export default function QaCapacityPage({ onNotify }) {
                           hoverTask === t.key && 'ring-2 ring-accent',
                         )}
                         style={{ borderLeftColor: avatarColor(t.key) }}
-                        title={`${g.storyKey} → ${t.summary}\n${t.left} of ${t.points} pt unplanned · ${t.status} · QA: ${emailUsername(t.assignee || '') || 'none'}`}
+                        title={`${g.storyKey} → ${t.summary}\n${t.left} of ${t.points} pt unplanned · ${t.status} · ${teamLabel}: ${emailUsername(t.assignee || '') || 'none'}`}
                       >
                         <span className="shrink-0 font-semibold text-accent-bright">{t.key}</span>
                         <span className="min-w-0 flex-1 truncate">{t.summary}</span>
                         <span className="shrink-0 font-medium text-ink tabular-nums">{t.left} pt</span>
-                        {CFG.qaEmails.includes(t.assignee) ? (
+                        {emails.includes(t.assignee) ? (
                           <>
                             <Avatar email={t.assignee} size="size-5" text="text-[9px]" />
                             <button
@@ -515,9 +594,16 @@ export default function QaCapacityPage({ onNotify }) {
                               ⚡
                             </button>
                           </>
+                        ) : !t.assignee ? (
+                          <span
+                            className="shrink-0 rounded-full border border-amber/50 bg-amber-soft px-2 py-[1px] text-[11px] font-medium text-amber"
+                            title="Fresh from grooming — drop on a member's capacity row: assigns it in Jira AND plans it"
+                          >
+                            unassigned
+                          </span>
                         ) : (
-                          <span className="shrink-0 text-[11px] text-muted" title="No QA assignee — drop on a capacity row to pick who">
-                            no QA
+                          <span className="shrink-0 text-[11px] text-muted" title={`Assignee is not in ${envVar} — drop on a capacity row to pick who`}>
+                            no {teamLabel}
                           </span>
                         )}
                       </div>
@@ -535,6 +621,7 @@ export default function QaCapacityPage({ onNotify }) {
           {...chunkEdit}
           plans={plans}
           tasks={tasks}
+          emails={emails}
           onClose={() => setChunkEdit(null)}
           onSave={(points) => {
             persist(chunkEdit.email, setChunkPoints(plans[chunkEdit.email], chunkEdit.day, chunkEdit.index, points))
@@ -704,7 +791,7 @@ function StoryGroup({ group, tasks, taskCells, taskOwners, allocated, days, toda
   )
 }
 
-function ChunkModal({ email, day, index, plans, tasks, onClose, onSave, onRemove, onSaveReflow, onMoveTo }) {
+function ChunkModal({ email, day, index, plans, tasks, emails, onClose, onSave, onRemove, onSaveReflow, onMoveTo }) {
   const chunk = plans[email]?.days?.[day]?.[index]
   const [points, setPoints] = useState(chunk?.points ?? 0)
   const [moveTo, setMoveTo] = useState('')
@@ -729,8 +816,8 @@ function ChunkModal({ email, day, index, plans, tasks, onClose, onSave, onRemove
         <div className="flex items-center gap-2">
           <span className="text-xs font-medium text-muted">Move this chunk to</span>
           <select className="rounded-lg border border-line bg-field px-2 py-1.5 text-[13px] text-ink-soft focus:border-accent" value={moveTo} onChange={(e) => setMoveTo(e.target.value)}>
-            <option value="">— pick QA —</option>
-            {CFG.qaEmails.filter((e) => e !== email).map((e) => (
+            <option value="">— pick member —</option>
+            {emails.filter((e) => e !== email).map((e) => (
               <option key={e} value={e}>{emailUsername(e)}</option>
             ))}
           </select>

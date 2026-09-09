@@ -84,6 +84,11 @@ const PRIORITY_CLASSES = {
   Lowest: 'text-blue',
 }
 
+// Long-list controls: groups render at most PAGE rows until "show more" /
+// "show all", and a group header click folds the whole group — so a
+// 3,000-issue "Showing all" view stays a short page instead of endless scroll.
+const PAGE = 50
+
 export default function IssueTable({ issues, showAssignee, onTransition, onReassign, specLinks = {}, burn = null }) {
   const showBurn = burn !== null
   const cols = showBurn ? 6 : 5
@@ -91,7 +96,16 @@ export default function IssueTable({ issues, showAssignee, onTransition, onReass
   // republished yet) the ⚡ Prompt popup still generates a usable prompt.
   const [template, setTemplate] = useState(DEFAULT_PROMPT_TEMPLATE)
   const [promptUrl, setPromptUrl] = useState(null) // spec url for the open popup
+  const [collapsed, setCollapsed] = useState(() => new Set()) // folded group names
+  const [shown, setShown] = useState({}) // group name -> row limit
   useEffect(() => watchPromptTemplate(setTemplate), [])
+
+  const toggleGroup = (name) =>
+    setCollapsed((prev) => {
+      const next = new Set(prev)
+      next.has(name) ? next.delete(name) : next.add(name)
+      return next
+    })
 
   if (!issues.length) {
     return (
@@ -118,10 +132,22 @@ export default function IssueTable({ issues, showAssignee, onTransition, onReass
             <th className={th} aria-label="actions" />
           </tr>
         </thead>
-        {groups.map((group) => (
+        {groups.map((group) => {
+          const isCollapsed = collapsed.has(group.name)
+          const limit = shown[group.name] ?? PAGE
+          const rows = isCollapsed ? [] : group.issues.slice(0, limit)
+          const hidden = group.issues.length - rows.length
+          return (
           <tbody key={group.name}>
-            <tr className="bg-bg/40">
+            <tr
+              className="cursor-pointer bg-bg/40 select-none hover:bg-panel-soft"
+              onClick={() => toggleGroup(group.name)}
+              title={isCollapsed ? 'Expand this group' : 'Collapse this group'}
+            >
               <td colSpan={cols} className="border-b border-line px-4 py-2">
+                <span aria-hidden className="mr-2 inline-block w-3 text-xs text-muted">
+                  {isCollapsed ? '▸' : '▾'}
+                </span>
                 <span
                   className="inline-block rounded-full border px-2.5 py-[2px] text-[11px] font-semibold tracking-[0.05em] uppercase"
                   style={{
@@ -135,7 +161,7 @@ export default function IssueTable({ issues, showAssignee, onTransition, onReass
                 <span className="ml-2 text-xs text-muted tabular-nums">{group.issues.length}</span>
               </td>
             </tr>
-            {group.issues.map((iss) => (
+            {rows.map((iss) => (
             <tr
               key={iss.key}
               className="group transition-colors last:*:border-b-0 hover:bg-panel-soft"
@@ -242,8 +268,30 @@ export default function IssueTable({ issues, showAssignee, onTransition, onReass
               </td>
             </tr>
             ))}
+            {!isCollapsed && hidden > 0 && (
+              <tr>
+                <td colSpan={cols} className="border-b border-line px-4 py-2.5">
+                  <span className="mr-3 text-xs text-muted tabular-nums">
+                    Showing {rows.length} of {group.issues.length}
+                  </span>
+                  <button
+                    className={miniBtn}
+                    onClick={() => setShown((s) => ({ ...s, [group.name]: limit + PAGE }))}
+                  >
+                    Show {Math.min(PAGE, hidden)} more
+                  </button>
+                  <button
+                    className={`${miniBtn} ml-1.5`}
+                    onClick={() => setShown((s) => ({ ...s, [group.name]: group.issues.length }))}
+                  >
+                    Show all
+                  </button>
+                </td>
+              </tr>
+            )}
           </tbody>
-        ))}
+          )
+        })}
       </table>
       {promptUrl && (
         <PromptModal template={template} url={promptUrl} onClose={() => setPromptUrl(null)} />

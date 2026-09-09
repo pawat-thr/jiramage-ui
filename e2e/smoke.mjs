@@ -71,13 +71,20 @@ try {
     ok(`${path} table renders`, true)
   }
 
-  // spec chip + prompt popup (needs at least one matching subtask)
-  await page.waitForFunction(
-    () => [...document.querySelectorAll('a')].some((a) => a.textContent.includes('Spec')),
-    { timeout: 30000 },
-  ).catch(() => {})
-  const hasSpec = await page.evaluate(() => [...document.querySelectorAll('a')].some((a) => a.textContent.includes('Spec')))
-  ok('spec chips resolve', hasSpec)
+  // spec chip + prompt popup (needs at least one matching subtask).
+  // Data-dependent: with zero active team issues there is nothing to chip.
+  const anyTeamRows = await page.evaluate(() => document.querySelectorAll('table tbody tr').length > 1)
+  let hasSpec = false
+  if (!anyTeamRows) {
+    console.log('  [skip] spec chips — no active team issues right now')
+  } else {
+    await page.waitForFunction(
+      () => [...document.querySelectorAll('a')].some((a) => a.textContent.includes('Spec')),
+      { timeout: 30000 },
+    ).catch(() => {})
+    hasSpec = await page.evaluate(() => [...document.querySelectorAll('a')].some((a) => a.textContent.includes('Spec')))
+    ok('spec chips resolve', hasSpec)
+  }
   if (hasSpec) {
     await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.textContent.includes('Prompt'))?.click())
     await sleep(400)
@@ -126,11 +133,20 @@ try {
   // ---- responsive: table scrolls sideways on phone ----
   await page.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true })
   await page.goto(BASE + '/team-task', { waitUntil: 'networkidle0' })
-  await page.waitForFunction(() => document.querySelectorAll('table tr').length > 2, { timeout: 60000 })
+  // data-dependent: an empty result set still renders (and still must not overflow)
+  await page.waitForFunction(
+    () =>
+      document.querySelectorAll('table tr').length > 2 ||
+      document.body.textContent.includes('No issues match'),
+    { timeout: 60000 },
+  )
+  const phoneEmpty = await page.evaluate(() => document.body.textContent.includes('No issues match'))
   ok('phone: no body-level horizontal overflow', await page.evaluate(
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth === 0,
   ))
-  ok('phone: task table scrolls sideways', await page.evaluate(() => {
+  if (phoneEmpty) {
+    console.log('  [skip] phone: task table scrolls sideways — no active team issues right now')
+  } else ok('phone: task table scrolls sideways', await page.evaluate(() => {
     const el = document.querySelector('.overflow-x-auto')
     return !!el && el.scrollWidth > el.clientWidth
   }))

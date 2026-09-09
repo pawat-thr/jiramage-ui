@@ -257,6 +257,16 @@ export async function fetchChangelog(key) {
   return all
 }
 
+// Grooming flow: subtasks are often created WITHOUT an assignee (SA grooms
+// first, the team assigns by effort after) — assignee-filtered fetches never
+// see them. This pulls the recent unassigned issues so the Capacity Planner
+// can show them for assign-by-effort.
+export function fetchUnassignedIssues() {
+  const jql =
+    projectFilter() + `assignee is EMPTY AND created >= "${CFG.teamFrom}" ORDER BY key DESC`
+  return searchAll(jql, ['summary', 'status', 'priority', 'assignee', 'issuetype', 'parent', CFG.pointField])
+}
+
 // QA Mode: the QA team's issues (same shape as team issues, QA_EMAILS source).
 export function fetchQaIssues() {
   if (!CFG.qaEmails.length) return Promise.resolve([])
