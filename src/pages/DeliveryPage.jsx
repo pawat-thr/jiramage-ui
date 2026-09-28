@@ -207,6 +207,7 @@ export default function DeliveryPage({ stories, onRefresh, refreshing, defaultRe
           storyKey={selectedKey}
           backLabel="Delivery Tracking"
           onBack={() => navigate('/delivery')}
+          onOpenIssue={(k) => navigate(`/delivery/${k}`)}
         />
       </div>
     )

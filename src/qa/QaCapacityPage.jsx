@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import ModalShell from '../components/common/ModalShell.jsx'
+import IssueDetailModal from '../features/issues/IssueDetailModal.jsx'
 import Spinner from '../components/common/Spinner.jsx'
 import FilterMenu from '../components/common/FilterMenu.jsx'
 import { fetchQaIssues, fetchUnassignedIssues, fetchStories, assignIssue, browseUrl, resolveAccountIds } from '../services/jiraApi.js'
@@ -74,6 +75,7 @@ export default function QaCapacityPage({
   const [release, setRelease] = useState('')
   const [storyReleases, setStoryReleases] = useState({}) // storyKey -> [release names]
   const [emailToId, setEmailToId] = useState({}) // member email -> Jira accountId (for assign-on-drop)
+  const [detailKey, setDetailKey] = useState(null) // issue key for the detail overlay
 
   useEffect(() => {
     let on = true
@@ -495,6 +497,7 @@ export default function QaCapacityPage({
                 hoverTask={hoverTask}
                 setHoverTask={setHoverTask}
                 onChunkClick={setChunkEdit}
+                onDetail={setDetailKey}
                 onMoveChunk={moveChunkDay}
                 onQuickRemove={(ref) => {
                   const { plan } = removeChunk(plans[ref.email], ref.day, ref.index)
@@ -581,7 +584,13 @@ export default function QaCapacityPage({
                         title={`${g.storyKey} → ${t.summary}\n${t.left} of ${t.points} pt unplanned · ${t.status} · ${teamLabel}: ${emailUsername(t.assignee || '') || 'none'}`}
                       >
                         <span className="shrink-0 font-semibold text-accent-bright">{t.key}</span>
-                        <span className="min-w-0 flex-1 truncate">{t.summary}</span>
+                        <button
+                          className="min-w-0 flex-1 cursor-pointer truncate text-left hover:text-accent-bright hover:underline"
+                          title={`${t.summary}\nClick for details`}
+                          onClick={() => setDetailKey(t.key)}
+                        >
+                          {t.summary}
+                        </button>
                         <span className="shrink-0 font-medium text-ink tabular-nums">{t.left} pt</span>
                         {emails.includes(t.assignee) ? (
                           <>
@@ -656,6 +665,8 @@ export default function QaCapacityPage({
         />
       )}
 
+      {detailKey && <IssueDetailModal issueKey={detailKey} onClose={() => setDetailKey(null)} />}
+
       {capEdit && (
         <CapacityModal
           {...capEdit}
@@ -672,7 +683,7 @@ export default function QaCapacityPage({
 }
 
 // One story group: header row + one row per task (card on the left, chunks across days).
-function StoryGroup({ group, tasks, taskCells, taskOwners, allocated, days, today, drag, setDrag, hoverTask, setHoverTask, onChunkClick, onMoveChunk, onQuickRemove }) {
+function StoryGroup({ group, tasks, taskCells, taskOwners, allocated, days, today, drag, setDrag, hoverTask, setHoverTask, onChunkClick, onDetail, onMoveChunk, onQuickRemove }) {
   return (
     <>
       <tr>
@@ -700,9 +711,13 @@ function StoryGroup({ group, tasks, taskCells, taskOwners, allocated, days, toda
                 <a className="shrink-0 text-[13px] font-semibold text-accent-bright hover:underline" href={browseUrl(key)} target="_blank" rel="noreferrer">
                   {key}
                 </a>
-                <span className="min-w-0 flex-1 truncate text-[13px] text-ink" title={t?.summary}>
+                <button
+                  className="min-w-0 flex-1 cursor-pointer truncate text-left text-[13px] text-ink hover:text-accent-bright hover:underline"
+                  title={`${t?.summary || ''}\nClick for details`}
+                  onClick={() => onDetail(key)}
+                >
                   {t?.summary || '(gone from Jira)'}
-                </span>
+                </button>
               </div>
               <div className="mt-1 flex items-center gap-1.5">
                 <span className={cx('text-[11px] tabular-nums', planned > (t?.points || 0) ? 'text-danger' : 'text-muted')}>

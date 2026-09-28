@@ -76,10 +76,12 @@ export function fetchIssueDetail(key) {
     'labels',
     'issuetype',
     'subtasks',
+    'parent',
     'comment',
     'attachment',
     'project',
     CFG.releaseField,
+    CFG.pointField,
   ].join(',')
   return jira(`/rest/api/3/issue/${key}?fields=${fields}`)
 }

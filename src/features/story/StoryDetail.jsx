@@ -6,6 +6,7 @@ import { releaseNames } from './releaseNames.js'
 import { avatarColor, initials } from '../pr/prConstants.js'
 import { fetchIssueDetail, fetchSubtasks, browseUrl } from '../../services/jiraApi.js'
 import { shortName } from '../../utils/format.js'
+import { CFG } from '../../config/appConfig.js'
 import { card, emptyState } from '../../utils/ui.js'
 
 const fmtDate = (iso) => (iso ? new Date(iso).toLocaleString() : '—')
@@ -35,7 +36,9 @@ function Person({ user }) {
   )
 }
 
-export default function StoryDetail({ storyKey, onBack, hideBack = false, backLabel = 'Story List' }) {
+// Renders full detail for ANY issue (story or subtask). `onOpenIssue(key)`
+// makes parent/subtask references navigate in-app instead of out to Jira.
+export default function StoryDetail({ storyKey, onBack, hideBack = false, backLabel = 'Story List', onOpenIssue = null }) {
   const [issue, setIssue] = useState(null)
   const [subtaskRows, setSubtaskRows] = useState(null)
   const [error, setError] = useState(null)
@@ -112,6 +115,34 @@ export default function StoryDetail({ storyKey, onBack, hideBack = false, backLa
         <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
           <Meta label="Type">{f.issuetype?.name}</Meta>
           <Meta label="Priority">{f.priority?.name}</Meta>
+          {f[CFG.pointField] != null && (
+            <Meta label="Points">
+              <span className="tabular-nums">{Number(f[CFG.pointField])}</span>
+            </Meta>
+          )}
+          {f.parent && (
+            <Meta label="Parent story">
+              {onOpenIssue ? (
+                <button
+                  className="text-left font-semibold text-violet hover:underline"
+                  onClick={() => onOpenIssue(f.parent.key)}
+                  title={f.parent.fields?.summary}
+                >
+                  {f.parent.key}
+                </button>
+              ) : (
+                <a
+                  className="font-semibold text-violet hover:underline"
+                  href={browseUrl(f.parent.key)}
+                  target="_blank"
+                  rel="noreferrer"
+                  title={f.parent.fields?.summary}
+                >
+                  {f.parent.key}
+                </a>
+              )}
+            </Meta>
+          )}
           <Meta label="Release">
             {releaseNames(issue).length ? (
               <span className="flex flex-wrap gap-1.5">
@@ -152,26 +183,48 @@ export default function StoryDetail({ storyKey, onBack, hideBack = false, backLa
             Subtasks <span className="text-muted">({subtasks.length})</span>
           </h3>
           <div className="mt-3 grid gap-2">
-            {subtasks.map((st) => (
-              <a
-                key={st.key}
-                href={browseUrl(st.key)}
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center justify-between gap-3 rounded-xl border border-line bg-field px-4 py-2.5 transition-colors hover:border-accent"
-              >
-                <span className="min-w-0 flex items-baseline gap-2">
-                  <span className="shrink-0 text-[13px] font-semibold text-accent-bright">{st.key}</span>
-                  <span className="truncate text-sm text-ink-soft">{st.fields?.summary}</span>
-                </span>
-                <span className="flex shrink-0 items-center gap-3">
-                  <span className="text-[13px] text-muted">
-                    <Person user={st.fields?.assignee} />
+            {subtasks.map((st) => {
+              const Row = onOpenIssue ? 'div' : 'a'
+              const rowProps = onOpenIssue
+                ? {
+                    onClick: () => onOpenIssue(st.key),
+                    role: 'button',
+                    tabIndex: 0,
+                    onKeyDown: (e) => e.key === 'Enter' && onOpenIssue(st.key),
+                    title: 'View subtask details',
+                  }
+                : { href: browseUrl(st.key), target: '_blank', rel: 'noreferrer' }
+              return (
+                <Row
+                  key={st.key}
+                  {...rowProps}
+                  className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-line bg-field px-4 py-2.5 text-left transition-colors hover:border-accent"
+                >
+                  <span className="min-w-0 flex items-baseline gap-2">
+                    <span className="shrink-0 text-[13px] font-semibold text-accent-bright">{st.key}</span>
+                    <span className="truncate text-sm text-ink-soft">{st.fields?.summary}</span>
                   </span>
-                  {st.fields?.status && <StatusBadge status={st.fields.status} />}
-                </span>
-              </a>
-            ))}
+                  <span className="flex shrink-0 items-center gap-3">
+                    <span className="text-[13px] text-muted">
+                      <Person user={st.fields?.assignee} />
+                    </span>
+                    {st.fields?.status && <StatusBadge status={st.fields.status} />}
+                    {onOpenIssue && (
+                      <a
+                        className="text-xs text-muted hover:text-accent-bright"
+                        href={browseUrl(st.key)}
+                        target="_blank"
+                        rel="noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        title="Open in Jira"
+                      >
+                        ↗
+                      </a>
+                    )}
+                  </span>
+                </Row>
+              )
+            })}
           </div>
         </div>
       )}

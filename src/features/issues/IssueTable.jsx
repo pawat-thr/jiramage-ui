@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import StatusBadge from '../../components/common/StatusBadge.jsx'
 import PromptModal from './PromptModal.jsx'
+import IssueDetailModal from './IssueDetailModal.jsx'
 import { browseUrl } from '../../services/jiraApi.js'
 import { watchPromptTemplate, DEFAULT_PROMPT_TEMPLATE } from '../../services/settingsApi.js'
 import { shortName, groupByType } from '../../utils/format.js'
@@ -96,6 +97,7 @@ export default function IssueTable({ issues, showAssignee, onTransition, onReass
   // republished yet) the ⚡ Prompt popup still generates a usable prompt.
   const [template, setTemplate] = useState(DEFAULT_PROMPT_TEMPLATE)
   const [promptUrl, setPromptUrl] = useState(null) // spec url for the open popup
+  const [detailKey, setDetailKey] = useState(null) // issue key for the detail overlay
   const [collapsed, setCollapsed] = useState(() => new Set()) // folded group names
   const [shown, setShown] = useState({}) // group name -> row limit
   useEffect(() => watchPromptTemplate(setTemplate), [])
@@ -177,12 +179,13 @@ export default function IssueTable({ issues, showAssignee, onTransition, onReass
                 </a>
               </td>
               <td className={td}>
-                <div
-                  className="max-w-[480px] truncate text-ink max-md:max-w-[200px]"
-                  title={iss.fields.summary}
+                <button
+                  className="block max-w-[480px] cursor-pointer truncate text-left text-ink hover:text-accent-bright hover:underline max-md:max-w-[200px]"
+                  title={`${iss.fields.summary}\nClick for details`}
+                  onClick={() => setDetailKey(iss.key)}
                 >
                   {iss.fields.summary}
-                </div>
+                </button>
                 {iss.fields.parent && (
                   <div className="mt-0.5 flex max-w-[480px] items-center gap-1.5 text-xs text-muted max-md:max-w-[200px]">
                     <span className="shrink-0">↳</span>
@@ -296,6 +299,7 @@ export default function IssueTable({ issues, showAssignee, onTransition, onReass
       {promptUrl && (
         <PromptModal template={template} url={promptUrl} onClose={() => setPromptUrl(null)} />
       )}
+      {detailKey && <IssueDetailModal issueKey={detailKey} onClose={() => setDetailKey(null)} />}
     </div>
   )
 }
