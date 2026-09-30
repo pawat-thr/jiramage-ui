@@ -10,11 +10,11 @@ import { PR_STATUSES, statusMeta, fmtTime } from '../features/pr/prConstants.js'
 import { watchPRs, createPR, updatePR, deletePR } from '../services/prApi.js'
 import { sendNotifications } from '../services/notificationsApi.js'
 import { firebaseEnabled } from '../services/firebase.js'
-import { CFG } from '../config/appConfig.js'
+import { CFG, teamMembers } from '../config/appConfig.js'
 import { emailUsername, uniqueSorted } from '../utils/format.js'
 import { card, chip, cx, toolbar, emptyState } from '../utils/ui.js'
 
-const MEMBERS = [CFG.email, ...CFG.teamEmails]
+const MEMBERS = teamMembers()
 
 function PrCard({ pr, onOpen }) {
   return (

@@ -11,7 +11,6 @@ import { CFG } from '../config/appConfig.js'
 import { uniqueSorted } from '../utils/format.js'
 import { card, cx, emptyState, toolbar, th, td } from '../utils/ui.js'
 
-const ROLES = CFG.integrationRoles
 
 const cellInput =
   'w-full rounded-lg border border-line bg-field px-2.5 py-1.5 text-[13px] text-ink placeholder:text-muted focus:border-accent'
@@ -270,7 +269,7 @@ export default function IntegrationPage({ defaultRelease = '', onNotify }) {
                 <th className={`${th} ${STICKY_TH.name}`}>Name</th>
                 <th className={`${th} ${STICKY_TH.status}`}>Status</th>
                 <th className={th}>Env</th>
-                {ROLES.map((r) => (
+                {CFG.integrationRoles.map((r) => (
                   <th key={r} className={`${th} whitespace-nowrap`}>
                     Target · {r}
                   </th>
@@ -308,7 +307,7 @@ export default function IntegrationPage({ defaultRelease = '', onNotify }) {
                   <td className={`${td} min-w-[110px]`}>
                     <EditCell row={row} field="env" placeholder="env…" onSave={saveCell} />
                   </td>
-                  {ROLES.map((r) => (
+                  {CFG.integrationRoles.map((r) => (
                     <td key={r} className={`${td} min-w-[150px]`}>
                       <EditCell row={row} field={`targetDates.${r}`} type="date" onSave={saveCell} />
                     </td>

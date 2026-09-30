@@ -2,7 +2,7 @@
 // 1 point = 1 hour. Default capacity: 8 points per working day (Mon–Fri).
 // A user-month plan: { capacity: { 'YYYY-MM-DD': n }, days: { 'YYYY-MM-DD': [ {key, points, delayed?} ] } }
 
-export const DEFAULT_CAPACITY = 8
+const DEFAULT_CAPACITY = 8
 
 export const dateKey = (d) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`

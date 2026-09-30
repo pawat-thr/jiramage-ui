@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { execSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
+import { parseInterval, list } from './src/config/configFields.js'
 
 // Short git commit hash for the build code (Minecraft-snapshot style),
 // e.g. v0.1.7+a3f9c2d. Falls back to "dev" outside a git checkout.
@@ -16,19 +17,8 @@ function gitHash() {
   }
 }
 
-// Parses Go-style durations like "5m", "30s", "1h" into milliseconds.
-function parseInterval(raw) {
-  const m = /^(\d+)([smh])$/.exec((raw || '').trim())
-  if (!m) return 5 * 60 * 1000
-  const n = Number(m[1])
-  return n * { s: 1000, m: 60000, h: 3600000 }[m[2]]
-}
-
-const list = (raw, upper = false) =>
-  (raw || '')
-    .split(',')
-    .map((s) => (upper ? s.trim().toUpperCase() : s.trim()))
-    .filter(Boolean)
+// parseInterval/list come from src/config/configFields.js — the SAME parsers
+// the runtime Firebase overlay uses, so .env and Firebase can't disagree.
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
@@ -52,7 +42,7 @@ export default defineConfig(({ mode }) => {
         qaEmails: list(env.QA_EMAILS),
         projects: list(env.JIRA_PROJECT, true),
         teamFrom: (env.JIRA_TEAM_FROM || '2024-05-01').trim(),
-        refreshMs: parseInterval(env.REFRESH_INTERVAL),
+        refreshMs: parseInterval(env.REFRESH_INTERVAL) ?? 5 * 60 * 1000,
         // Jira custom field id holding the "Release" on a card (option field).
         releaseField: (env.JIRA_RELEASE_FIELD || 'customfield_10127').trim(),
         // Jira custom field id holding story points (number field).

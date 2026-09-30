@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { CFG } from '../config/appConfig.js'
+import { CFG, teamMembers } from '../config/appConfig.js'
 import { card, cx } from '../utils/ui.js'
 import { useTheme } from '../hooks/useTheme.js'
 import { THEME_OPTIONS } from '../utils/theme.js'
@@ -15,6 +15,17 @@ import {
   DEFAULT_PROMPT_TEMPLATE,
 } from '../services/settingsApi.js'
 import PasswordField from '../components/common/PasswordField.jsx'
+import {
+  CONFIG_FIELDS,
+  cfgToRaw,
+  envRawOf,
+  validateFieldRaw,
+  loadTeamConfig,
+  saveTeamConfig,
+  logConfigChange,
+  loadConfigHistory,
+} from '../services/configApi.js'
+import { emailUsername } from '../utils/format.js'
 
 const label = 'block text-xs font-medium text-muted mb-1.5'
 const editable =
@@ -146,6 +157,140 @@ function ChangePassword({ onNotify }) {
 }
 
 const THEME_LABELS = { light: 'Light', dark: 'Dark', system: 'System' }
+
+// Movable team config: Firestore (settings/config) overrides .env per field.
+// Empty input = no override → the .env value (shown as placeholder) applies.
+// Saving reloads the page so the overlay re-applies everywhere.
+function TeamConfig({ onNotify, user }) {
+  const [saved, setSaved] = useState(null) // stored doc (null = loading)
+  const [draft, setDraft] = useState({})
+  const [busy, setBusy] = useState(false)
+  const [history, setHistory] = useState([])
+
+  useEffect(() => {
+    let on = true
+    loadConfigHistory().then((h) => on && setHistory(h)).catch(() => {})
+    loadTeamConfig()
+      .then((d) => on && setSaved(d))
+      .catch((err) => {
+        if (!on) return
+        onNotify(err.message, true)
+        setSaved({})
+      })
+    return () => {
+      on = false
+    }
+  }, [])
+
+  if (saved === null) return <p className="text-[13px] text-muted">Loading team config…</p>
+
+  const valueOf = (f) => draft[f.env] ?? saved[f.env] ?? ''
+  const dirty = CONFIG_FIELDS.some((f) => (draft[f.env] ?? saved[f.env] ?? '') !== (saved[f.env] ?? ''))
+
+  const errors = Object.fromEntries(
+    CONFIG_FIELDS.map((f) => [f.env, validateFieldRaw(f, valueOf(f))]).filter(([, e]) => e),
+  )
+
+  const save = async () => {
+    if (Object.keys(errors).length) {
+      onNotify('Fix the highlighted fields first — invalid values would break Jira queries for the whole team', true)
+      return
+    }
+    setBusy(true)
+    try {
+      const data = Object.fromEntries(CONFIG_FIELDS.map((f) => [f.env, String(valueOf(f)).trim()]))
+      await saveTeamConfig(data)
+      // audit log: who changed what (append-only; failure must not block the save)
+      await logConfigChange(user?.email, saved, data).catch(() => {})
+      onNotify('✓ Team config saved — reloading to apply…')
+      setTimeout(() => window.location.reload(), 900)
+    } catch (err) {
+      onNotify(err.message, true)
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="grid gap-4">
+      {CONFIG_FIELDS.map((f) => {
+        const overridden = String(saved[f.env] ?? '').trim() !== ''
+        return (
+          <div key={f.env}>
+            <div className="mb-1.5 flex items-center justify-between gap-2">
+              <span className="font-mono text-xs font-medium text-muted">{f.env}</span>
+              <span
+                className={cx(
+                  'rounded-full border px-2 py-[1px] text-[10px] font-medium',
+                  overridden
+                    ? 'border-violet/50 bg-violet-soft text-violet'
+                    : 'border-line bg-field text-muted',
+                )}
+                title={overridden ? 'This value comes from Firebase and overrides .env' : 'No override — the .env value applies'}
+              >
+                {overridden ? 'Firebase' : '.env'}
+              </span>
+            </div>
+            <input
+              className={cx(editable, errors[f.env] && 'border-danger')}
+              value={valueOf(f)}
+              placeholder={envRawOf(f) ? `.env: ${envRawOf(f)}` : '(not set in .env)'}
+              onChange={(e) => setDraft((d) => ({ ...d, [f.env]: e.target.value }))}
+            />
+            <p className={cx('mt-1 text-xs', errors[f.env] ? 'text-danger' : 'text-muted')}>
+              {errors[f.env] || f.hint}
+            </p>
+          </div>
+        )
+      })}
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-xs text-muted">
+          Empty field = use the <code>.env</code> value (shown greyed). Saving reloads the app for
+          you; teammates get a "reload to apply" prompt.
+        </span>
+        <button
+          disabled={!dirty || busy || Object.keys(errors).length > 0}
+          onClick={save}
+          className="shrink-0 rounded-full border border-accent bg-accent-soft px-5 py-2 text-sm font-semibold text-accent-bright transition-colors hover:bg-accent hover:text-bg disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {busy ? 'Saving…' : 'Save team config'}
+        </button>
+      </div>
+
+      {history.length > 0 && (
+        <div className="border-t border-line pt-4">
+          <h3 className="text-sm font-semibold text-ink">Change history</h3>
+          <p className="mt-0.5 mb-3 text-xs text-muted">
+            Who changed the team config (append-only — last {history.length} saves).
+          </p>
+          <div className="grid gap-2.5">
+            {history.map((h) => (
+              <div key={h.id} className="rounded-xl border border-line bg-field px-3.5 py-2.5">
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-[13px] font-semibold text-ink">
+                    {emailUsername(h.by || '') || h.by}
+                  </span>
+                  <span className="text-xs text-muted">
+                    {h.at?.toDate ? h.at.toDate().toLocaleString() : '…'}
+                  </span>
+                </div>
+                <div className="mt-1 grid gap-0.5">
+                  {Object.entries(h.changes || {}).map(([field, c]) => (
+                    <div key={field} className="truncate text-xs" title={`${field}: "${c.from}" → "${c.to}"`}>
+                      <span className="font-mono text-muted">{field}</span>{' '}
+                      <span className="text-ink-soft">{c.from || '(empty)'}</span>
+                      <span className="text-muted"> → </span>
+                      <span className="text-accent-bright">{c.to || '(empty)'}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 // Team-shared dev prompt template. Must contain {link} exactly once — it gets
 // replaced by a card's Confluence spec URL when generating a prompt.
@@ -340,6 +485,32 @@ export default function SettingsPage({ onNotify, user }) {
         </Section>
       )}
 
+      {firebaseEnabled ? (
+        <>
+          <ZoneHeader
+            title="Team configuration"
+            hint="Shared via Firebase and applied for the whole team. Each field overrides its .env value; leave a field empty to keep using .env."
+          />
+          <Section title="Team config">
+            <TeamConfig onNotify={onNotify} user={user} />
+          </Section>
+        </>
+      ) : (
+        <>
+          <ZoneHeader
+            title="Team configuration"
+            hint="Read from .env (no Firebase configured — with Firebase these become editable here for the whole team)."
+          />
+          <Section title="Team config" locked>
+            {CONFIG_FIELDS.map((f) => (
+              <Row key={f.env} name={f.env}>
+                {cfgToRaw(f)}
+              </Row>
+            ))}
+          </Section>
+        </>
+      )}
+
       <ZoneHeader
         title="Fixed configuration"
         hint={
@@ -360,7 +531,7 @@ export default function SettingsPage({ onNotify, user }) {
       <Section title="Team" locked>
         <Row name="Team members">
           <span className="flex flex-wrap gap-2">
-            {[CFG.email, ...CFG.teamEmails].map((e) => (
+            {teamMembers().map((e) => (
               <span
                 key={e}
                 className="rounded-full border border-line bg-field px-3 py-1 text-[13px] text-ink-soft"

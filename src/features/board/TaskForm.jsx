@@ -5,13 +5,13 @@ import StatusBadge from '../../components/common/StatusBadge.jsx'
 import { ENVS } from './boardConstants.jsx'
 import { avatarColor } from '../pr/prConstants.js'
 import { searchStoriesByText } from '../../services/jiraApi.js'
-import { CFG } from '../../config/appConfig.js'
+import { CFG, teamMembers } from '../../config/appConfig.js'
 import { cx, chip } from '../../utils/ui.js'
 
 const label = 'block text-xs font-medium text-muted mb-1.5'
 const input =
   'w-full rounded-xl border border-line bg-field px-3.5 py-2 text-sm text-ink placeholder:text-muted'
-const MEMBERS = [CFG.email, ...CFG.teamEmails]
+const MEMBERS = teamMembers()
 
 const pill = (active) =>
   cx(

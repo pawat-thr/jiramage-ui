@@ -15,7 +15,7 @@ import {
 import { emailUsername } from '../utils/format.js'
 import { claimedSpecUrls, stripBrackets } from '../features/issues/specMatch.js'
 import { QA_CATEGORIES } from '../features/delivery/deliveryUtils.js'
-import { CFG } from '../config/appConfig.js'
+import { CFG, teamMembers } from '../config/appConfig.js'
 import { card, cx, emptyState, searchInput, toolbar } from '../utils/ui.js'
 
 const input =
@@ -24,12 +24,14 @@ const input =
 let customSeq = 0
 const pageIdOf = (url) => /pageId=(\d+)|\/pages\/(\d+)/.exec(url || '')?.slice(1).find(Boolean)
 
-const MEMBERS = [CFG.email, ...CFG.teamEmails]
+const MEMBERS = teamMembers()
 
+// prefix is a GETTER: the team-config overlay mutates CFG after this module
+// loads, so a static capture would keep creating subtasks with stale prefixes.
 const ROLE_META = {
-  BE: { color: 'var(--color-violet)', prefix: CFG.subtaskPrefixBe, hint: 'from Confluence specs' },
-  FE: { color: 'var(--color-blue)', prefix: CFG.subtaskPrefixFe, hint: 'add what the story needs' },
-  QA: { color: 'var(--color-amber)', prefix: CFG.subtaskPrefixQa, hint: 'standard QA checklist' },
+  BE: { color: 'var(--color-violet)', get prefix() { return CFG.subtaskPrefixBe }, hint: 'from Confluence specs' },
+  FE: { color: 'var(--color-blue)', get prefix() { return CFG.subtaskPrefixFe }, hint: 'add what the story needs' },
+  QA: { color: 'var(--color-amber)', get prefix() { return CFG.subtaskPrefixQa }, hint: 'standard QA checklist' },
 }
 const withPrefix = (role, name) =>
   `${ROLE_META[role].prefix ? ROLE_META[role].prefix + ' ' : ''}${name}`

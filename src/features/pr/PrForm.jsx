@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import ModalShell from '../../components/common/ModalShell.jsx'
 import MemberPicker from '../../components/common/MemberPicker.jsx'
-import { CFG } from '../../config/appConfig.js'
+import { CFG, teamMembers } from '../../config/appConfig.js'
 
 const label = 'block text-xs font-medium text-muted mb-1.5'
 const input =
   'w-full rounded-xl border border-line bg-field px-3.5 py-2 text-sm text-ink placeholder:text-muted'
 
-const MEMBERS = [CFG.email, ...CFG.teamEmails]
+const MEMBERS = teamMembers()
 
 // Create or edit a PR. `pr` present = edit mode.
 export default function PrForm({ pr, onClose, onSubmit }) {

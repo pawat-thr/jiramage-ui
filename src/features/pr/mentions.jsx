@@ -1,12 +1,12 @@
 import { useRef, useState } from 'react'
-import { CFG } from '../../config/appConfig.js'
+import { CFG, teamMembers } from '../../config/appConfig.js'
 import { emailUsername } from '../../utils/format.js'
 import { avatarColor, initials } from './prConstants.js'
 import { cx } from '../../utils/ui.js'
 
 // Everyone who can be @mentioned: the whole team, addressed by email username
 // (e.g. @tanawat.k for tanawat.k@orbitdigital.co.th).
-const MENTIONABLE = [CFG.email, ...CFG.teamEmails].map((email) => ({
+const MENTIONABLE = teamMembers().map((email) => ({
   email,
   name: emailUsername(email),
 }))

@@ -21,6 +21,7 @@ import {
 import { exportDeliveryXlsx } from '../features/delivery/exportXlsx.js'
 import { fetchSubtasksForParents, browseUrl } from '../services/jiraApi.js'
 import { uniqueSorted } from '../utils/format.js'
+import { CFG } from '../config/appConfig.js'
 import { card, cx, emptyState, searchInput, toolbar, th, td } from '../utils/ui.js'
 
 const MAX_STORIES = 300 // safety cap on the bulk subtask fetch
@@ -94,9 +95,11 @@ export default function DeliveryPage({ stories, onRefresh, refreshing, defaultRe
   const setRelease = (v) => {
     setReleaseTouched(true)
     setReleaseState(v)
+    setPrefix('') // prefix availability differs per release
   }
   const [status, setStatus] = useState('')
   const [search, setSearch] = useState('')
+  const [prefix, setPrefix] = useState('') // only stories having a subtask named with this prefix
   const [view, setView] = useState('delivery') // 'delivery' | 'qa'
   // QA pair filter — applies only when BOTH type and state are chosen.
   const [qaType, setQaType] = useState('')
@@ -107,9 +110,11 @@ export default function DeliveryPage({ stories, onRefresh, refreshing, defaultRe
   // Detail view is URL-driven: /delivery/<KEY> (reuses the story detail).
   const location = useLocation()
   const navigate = useNavigate()
-  const selectedKey = location.pathname.startsWith('/delivery/')
-    ? decodeURIComponent(location.pathname.slice('/delivery/'.length))
-    : null
+  // Detail routes nest: /delivery/<story> and /delivery/<story>/<subtask>,
+  // so "back" from a subtask lands on its story, not the list.
+  const [selectedKey, selectedSubKey] = location.pathname.startsWith('/delivery/')
+    ? decodeURIComponent(location.pathname.slice('/delivery/'.length)).split('/')
+    : [null, null]
 
   const releaseOptions = useMemo(
     () => uniqueSorted((stories || []).flatMap(releaseNames)),
@@ -124,6 +129,12 @@ export default function DeliveryPage({ stories, onRefresh, refreshing, defaultRe
   const statusOptions = useMemo(
     () => uniqueSorted(inRelease.map((s) => s.fields.status.name)),
     [inRelease],
+  )
+
+  // Prefix options come from the CONFIGURED subtask prefixes (Settings team
+  // config / .env: SUBTASK_PREFIX_BE / _FE / _QA), not hardcoded roles.
+  const prefixOptions = uniqueSorted(
+    [CFG.subtaskPrefixBe, CFG.subtaskPrefixFe, CFG.subtaskPrefixQa].filter(Boolean),
   )
 
   // Bulk-load subtasks for the release's stories.
@@ -186,8 +197,17 @@ export default function DeliveryPage({ stories, onRefresh, refreshing, defaultRe
         return true
       })
       .map((s) => ({ s, stats: deliveryStats(subMap?.[s.key]) }))
+      // prefix filter narrows the LIST only — the release summary above stays
+      // computed from every story (rollup/qaAgg use inRelease, not rows)
+      .filter(
+        ({ s }) =>
+          !prefix ||
+          (subMap?.[s.key] || []).some((st) =>
+            (st.fields?.summary || '').toLowerCase().startsWith(prefix.toLowerCase()),
+          ),
+      )
       .sort((a, b) => storyProgress(a.s, a.stats) - storyProgress(b.s, b.stats))
-  }, [inRelease, status, search, subMap])
+  }, [inRelease, status, search, subMap, prefix])
 
   // QA view rows: apply the Type+State pair filter (both fields required).
   const qaRows = useMemo(() => {
@@ -201,13 +221,16 @@ export default function DeliveryPage({ stories, onRefresh, refreshing, defaultRe
   }, [rows, view, qaType, qaState, subMap])
 
   if (selectedKey) {
+    const showing = selectedSubKey || selectedKey
     return (
-      <div key={selectedKey} className="animate-enter">
+      <div key={showing} className="animate-enter">
         <StoryDetail
-          storyKey={selectedKey}
-          backLabel="Delivery Tracking"
-          onBack={() => navigate('/delivery')}
-          onOpenIssue={(k) => navigate(`/delivery/${k}`)}
+          storyKey={showing}
+          backLabel={selectedSubKey ? selectedKey : 'Delivery Tracking'}
+          onBack={() => navigate(selectedSubKey ? `/delivery/${selectedKey}` : '/delivery')}
+          onOpenIssue={(k) =>
+            navigate(k === selectedKey ? `/delivery/${selectedKey}` : `/delivery/${selectedKey}/${k}`)
+          }
         />
       </div>
     )
@@ -225,6 +248,7 @@ export default function DeliveryPage({ stories, onRefresh, refreshing, defaultRe
         />
         <FilterMenu label="Release" value={release} options={releaseOptions} onPick={setRelease} />
         <FilterMenu label="Status" value={status} options={statusOptions} onPick={setStatus} />
+        <FilterMenu label="Prefix" value={prefix} options={prefixOptions} onPick={setPrefix} />
         <div className="inline-flex rounded-xl border border-line bg-field p-1">
           {[
             ['delivery', 'Delivery'],

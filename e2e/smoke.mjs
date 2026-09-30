@@ -72,11 +72,14 @@ try {
   }
 
   // spec chip + prompt popup (needs at least one matching subtask).
-  // Data-dependent: with zero active team issues there is nothing to chip.
-  const anyTeamRows = await page.evaluate(() => document.querySelectorAll('table tbody tr').length > 1)
+  // Data-dependent: chips only exist on SUBTASK rows (↳ parent line) — with no
+  // active subtasks there is nothing to chip.
+  const anySubtaskRows = await page.evaluate(() =>
+    [...document.querySelectorAll('table tbody tr')].some((r) => r.textContent.includes('↳')),
+  )
   let hasSpec = false
-  if (!anyTeamRows) {
-    console.log('  [skip] spec chips — no active team issues right now')
+  if (!anySubtaskRows) {
+    console.log('  [skip] spec chips — no active subtasks right now')
   } else {
     await page.waitForFunction(
       () => [...document.querySelectorAll('a')].some((a) => a.textContent.includes('Spec')),

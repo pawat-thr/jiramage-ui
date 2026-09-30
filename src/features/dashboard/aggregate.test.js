@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 
 vi.mock('../../config/appConfig.js', () => ({
   CFG: { email: 'me@x.com', teamEmails: ['tm@x.com'] },
+  teamMembers: () => ['me@x.com', 'tm@x.com'],
 }))
 
 const { memberStats, statusStats, typeStats, summaryStats } = await import('./aggregate.js')

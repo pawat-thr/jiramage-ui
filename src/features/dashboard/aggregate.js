@@ -1,4 +1,4 @@
-import { CFG } from '../../config/appConfig.js'
+import { CFG, teamMembers } from '../../config/appConfig.js'
 import { emailUsername, shortName } from '../../utils/format.js'
 
 // Status-category ramp for the stacked chart — single-hue mint sequence plus a
@@ -12,7 +12,7 @@ export const CATEGORIES = [
 
 // Per-member counts by status category. Every configured member (me included)
 // is seeded so people with zero tasks still appear on the chart.
-export function memberStats(issues, emails = [CFG.email, ...CFG.teamEmails]) {
+export function memberStats(issues, emails = teamMembers()) {
   const byKey = new Map()
   const seed = (key, name, isMe) =>
     byKey.set(key, {
@@ -72,7 +72,7 @@ export function typeStats(issues) {
 
 // Active (not done) SUBTASKS per member, with story-point sums. Every
 // configured member is seeded so everyone shows even at zero.
-export function activeSubtaskPoints(issues, emails = [CFG.email, ...CFG.teamEmails]) {
+export function activeSubtaskPoints(issues, emails = teamMembers()) {
   const byKey = new Map()
   const seed = (key, name, isMe) => byKey.set(key, { key, name, isMe, count: 0, points: 0 })
   emails.forEach((e) => seed(e, emailUsername(e), e === CFG.email))

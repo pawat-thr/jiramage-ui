@@ -92,6 +92,14 @@ service cloud.firestore {
       allow read, write: if signedIn();
     }
 
+    // Team-config audit log: APPEND-ONLY — entries can be read and created,
+    // never edited or deleted, so the "who changed what" history can't be
+    // rewritten. Each entry must be stamped with the writer's own email.
+    match /settings/config/history/{entryId} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.resource.data.by == email();
+    }
+
     // Integration Plan rows (per release+story): any member can read, sync
     // (create/delete during sync), and edit env/dates/remark.
     match /integration/{docId} {

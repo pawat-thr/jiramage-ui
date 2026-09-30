@@ -1,4 +1,4 @@
-import { CFG } from '../config/appConfig.js'
+import { CFG, teamMembers } from '../config/appConfig.js'
 
 // All requests go through the Vite dev-server proxy at /jira, which injects
 // the Basic-auth header from .env — the token never reaches the browser.
@@ -55,7 +55,7 @@ export function fetchStories() {
 }
 
 export function fetchTeamIssues() {
-  const emails = [CFG.email, ...CFG.teamEmails]
+  const emails = teamMembers()
   const jql =
     projectFilter() +
     `assignee in (${quote(emails)}) AND created >= "${CFG.teamFrom}" ORDER BY key DESC`
