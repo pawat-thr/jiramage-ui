@@ -2,7 +2,8 @@
 
 > Purpose: full working context for Jiramage development. If you (Claude) are
 > reading this in a fresh session, this file + the docs/ changelogs + the code
-> are everything you need. Last updated: 2026-09-11, at v0.1.8-beta.2.
+> are everything you need. Last updated: 2026-10-01, at v0.1.8 FINAL (tagged);
+> next up: v0.1.9-beta — the LAST demo version before 0.2.0.
 
 ## Who / what
 
@@ -20,8 +21,9 @@
 
 ## Hard rules (user-set — do not violate)
 
-1. **NO new unit tests during betas.** User will write them after beta2. Only
-   maintain existing tests if they break (e2e smoke maintenance is allowed).
+1. **The beta-era unit-test freeze is OVER** (lifted at the 0.1.8 release):
+   new features should come with tests again. Suite at 0.1.8: 180 unit tests /
+   29 files + 16 e2e smoke checks.
 2. **User commits themselves.** Never commit/push unless explicitly asked.
 3. **.env edits: only append complete lines at the END of the file.** A splice
    once corrupted the user's QA_EMAILS line — never edit mid-file.
@@ -35,9 +37,10 @@
 
 ## How to verify work (established pattern)
 
-- `npm run build` then `npm test -- --run` (**136 tests / 25 files** must stay
-  green) then `npm run test:e2e` (13-check headless-Chrome smoke suite; two
-  checks auto-skip with `[skip]` when the team has zero active issues).
+- `npm run build` then `npm test -- --run` (**180 tests / 29 files** must stay
+  green) then `npm run test:e2e` (16-check headless-Chrome smoke suite;
+  data-dependent checks auto-skip with `[skip]` when the team has zero active
+  subtasks).
 - Manual browser verification: start
   `KEYCLOAK_ISSUER= VITE_FIREBASE_API_KEY=REPLACE-disabled npx vite --port 5198 --strictPort`
   (individual mode, no login), then drive puppeteer-core via
@@ -99,11 +102,12 @@
   `QA_BURN_FINISHED_STATUSES=Done`.
 - Spec chips: token-run matching of subtask names vs Confluence links;
   cache key is version-stamped; failed fetches never persisted.
-- `firestore.rules` — has a `qaPlan` block (read/write if signedIn).
-  **USER MUST REPUBLISH RULES** (may not have done it yet).
-- `e2e/smoke.mjs` — the 13-check suite; spawns its own vite on port 5199.
+- `firestore.rules` — blocks incl. `qaPlan` and the append-only
+  `settings/config/history` (both published). Any NEW block needs a republish
+  reminder to the user.
+- `e2e/smoke.mjs` — the 16-check suite; spawns its own vite on port 5199.
 
-## Current state (at beta.2 cut, all verified green)
+## Current state (v0.1.8 FINAL tagged, all verified green)
 
 - beta.2 committed content: task-first planner layout (4 UX rounds), planner in
   main mode (`/capacity`, "Capacity Planner (beta)" nav), grooming flow,
@@ -118,7 +122,9 @@
 - Known issues (user will fix before 0.2): Integration Plan / Team Board /
   qaPlan are whole-doc last-write-wins; concurrent edits lose data silently.
 - 0.2.0 roadmap (agreed in product review): deployment + server-side Jira
-  token → concurrency fixes → runtime settings (work-time etc.) → unit tests.
+  token (+ login-user-overwrites-JIRA_EMAIL) → concurrency fixes → remaining
+  runtime settings (work-time). Unit tests: DONE at 0.1.8.
+- Next: **v0.1.9-beta.1 — the LAST demo version before 0.2.0** (docs/v0.1.9.md).
 
 ## Env vars (in user's real .env — never splice!)
 
@@ -129,6 +135,21 @@
 `INTEGRATION_ROLES=BE,WEB,MOB`, `REFRESH_INTERVAL`, Firebase keys,
 `POINT_FIELD`/`RELEASE_FIELD` custom field ids. All parsed in vite.config.js
 into `CFG` (src/config/appConfig.js re-exports).
+
+## Added between beta.2 and the 0.1.8 final (all in docs/v0.1.8.md)
+
+- Subtask detail overlay (`IssueDetailModal` wrapping the generic StoryDetail)
+  from every subtask row; Delivery routes nest `/delivery/{story}/{subtask}`
+- Firebase **team config** (13 movable env fields, precedence Firebase > .env >
+  default, rule-4 blocking screen) + Settings editor with per-field validation
+  (`src/config/configFields.js` is THE shared field spec for vite + runtime) +
+  append-only audit log (`settings/config/history`) + localStorage-cached boot
+  with a "reload to apply" pill when stale
+- `teamMembers()` roster (TEAM_EMAILS includes self, case-insensitive dedupe)
+- Delivery: configured-prefix filter (list only; summary stays release-wide)
+- An 8-finding adversarial review round was fixed pre-release — notably: Spec
+  Wizard's ROLE_META uses live getters (module-level CFG captures BREAK the
+  config overlay — always read moved CFG fields at render/call time!)
 
 ## Working style that fits this user
 

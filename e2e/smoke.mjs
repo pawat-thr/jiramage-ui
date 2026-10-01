@@ -122,11 +122,41 @@ try {
   await sleep(600)
   ok('QA view renders', await page.evaluate(() => document.body.textContent.includes('QA Total')))
 
+  // ---- capacity planner (main mode) ----
+  await page.goto(BASE + '/capacity', { waitUntil: 'networkidle0' })
+  await page.waitForFunction(
+    () => document.querySelector('table') || document.body.textContent.includes('No team configured'),
+    { timeout: 90000 },
+  )
+  await sleep(1500)
+  ok('capacity planner renders (strip + dock)', await page.evaluate(() => {
+    const t = document.body.textContent
+    // "Task / Capacity" is uppercased by CSS only — textContent keeps the source casing
+    return !!document.querySelector('table') && t.includes('Unplanned') && t.includes('Task / Capacity')
+  }))
+
+  // ---- subtask detail overlay (from team task) ----
+  await page.goto(BASE + '/team-task', { waitUntil: 'networkidle0' })
+  await sleep(1200)
+  const hasDetailRow = await page.evaluate(() => !!document.querySelector('table tbody td button'))
+  if (!hasDetailRow) {
+    console.log('  [skip] issue detail overlay — no issue rows right now')
+  } else {
+    await page.evaluate(() => document.querySelector('table tbody td button').click())
+    await page.waitForFunction(() => document.querySelector('[role="dialog"] h2'), { timeout: 60000 })
+    ok('issue detail overlay opens with content', true)
+    await page.keyboard.press('Escape')
+    await sleep(300)
+    ok('issue detail overlay closes on Esc', await page.evaluate(() => !document.querySelector('[role="dialog"]')))
+  }
+
   // ---- settings ----
   await page.goto(BASE + '/settings', { waitUntil: 'networkidle0' })
   await sleep(400)
   const s = await page.evaluate(() => document.body.textContent)
   ok('settings zones render', s.includes('Fixed configuration') && s.includes('Dev Prompt'))
+  ok('settings team config lists the movable fields',
+    ['REFRESH_INTERVAL', 'JIRA_PROJECT', 'QA_EMAILS', 'BURN_STATUSES'].every((k) => s.includes(k)))
 
   // ---- routing guards ----
   await page.goto(BASE + '/inbox', { waitUntil: 'networkidle0' })
