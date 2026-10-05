@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
-import { avatarColor, initials } from '../../features/pr/prConstants.js'
 import { emailUsername } from '../../utils/format.js'
 import { cx } from '../../utils/ui.js'
+import Avatar from './Avatar.jsx'
 
 // Show the filter box once the team is big enough that scanning pills gets slow.
 const FILTER_AT = 8
@@ -29,12 +29,7 @@ export default function MemberPicker({ members, selected, onToggle, emptyHint = 
                 key={email}
                 className="flex items-center gap-1.5 rounded-full border border-accent bg-accent-soft py-0.5 pr-1 pl-1 text-[13px] text-accent-bright"
               >
-                <span
-                  className="grid size-4.5 place-items-center rounded-full text-[9px] font-bold text-bg"
-                  style={{ background: avatarColor(email) }}
-                >
-                  {initials(emailUsername(email))}
-                </span>
+                <Avatar id={email} name={emailUsername(email)} className="grid size-4.5 place-items-center rounded-full text-[9px] font-bold text-bg" />
                 {emailUsername(email)}
                 <button
                   type="button"
@@ -86,12 +81,7 @@ export default function MemberPicker({ members, selected, onToggle, emptyHint = 
               )}
               onClick={() => onToggle(email)}
             >
-              <span
-                className="grid size-4.5 place-items-center rounded-full text-[9px] font-bold text-bg"
-                style={{ background: avatarColor(email) }}
-              >
-                {initials(emailUsername(email))}
-              </span>
+              <Avatar id={email} name={emailUsername(email)} className="grid size-4.5 place-items-center rounded-full text-[9px] font-bold text-bg" />
               {emailUsername(email)}
               {active && <span aria-hidden>✓</span>}
             </button>

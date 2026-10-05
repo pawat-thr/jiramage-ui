@@ -1,9 +1,10 @@
 import { TASK_STATUSES, taskStatusMeta } from './boardConstants.jsx'
 import StoryDetail from '../story/StoryDetail.jsx'
 import { setTaskStatus } from '../../services/teamBoardApi.js'
-import { avatarColor, initials, fmtTime } from '../pr/prConstants.js'
+import { avatarColor, fmtTime } from '../pr/prConstants.js'
 import { emailUsername, todayLocalISO } from '../../utils/format.js'
 import { cx, card } from '../../utils/ui.js'
+import Avatar from '../../components/common/Avatar.jsx'
 
 function Meta({ label, children }) {
   return (
@@ -87,9 +88,7 @@ export default function TaskDetail({ task, user, onBack, onEdit, onDelete, onNot
               <span className="flex flex-wrap gap-1.5">
                 {task.users.map((email) => (
                   <span key={email} className="flex items-center gap-1.5 rounded-full border border-line bg-field py-0.5 pr-2.5 pl-1 text-[13px] text-ink-soft">
-                    <span className="grid size-5 place-items-center rounded-full text-[10px] font-bold text-bg" style={{ background: avatarColor(email) }}>
-                      {initials(emailUsername(email))}
-                    </span>
+                    <Avatar id={email} name={emailUsername(email)} className="grid size-5 place-items-center rounded-full text-[10px] font-bold text-bg" />
                     {emailUsername(email)}
                   </span>
                 ))}

@@ -1,17 +1,18 @@
-import { useCallback, useEffect, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useState } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import Sidebar from '../components/layout/Sidebar.jsx'
 import TopBar from '../components/layout/TopBar.jsx'
 import Toast from '../components/common/Toast.jsx'
 import DashboardPage from '../pages/DashboardPage.jsx'
 import TeamPage from '../pages/TeamPage.jsx'
-import QaCapacityPage from './QaCapacityPage.jsx'
+const QaCapacityPage = lazy(() => import('./QaCapacityPage.jsx'))
 import TransitionModal from '../features/issues/TransitionModal.jsx'
 import ReassignModal from '../features/issues/ReassignModal.jsx'
 import { fetchQaIssues } from '../services/jiraApi.js'
 import { useToast } from '../hooks/useToast.js'
 import { CFG } from '../config/appConfig.js'
 import { card, emptyState } from '../utils/ui.js'
+import Spinner from '../components/common/Spinner.jsx'
 
 export const QA_BASE = '/jiramage/qa'
 
@@ -134,7 +135,11 @@ export default function QaApp({ user, onLogout }) {
                   burnStatuses={CFG.qaBurnStatuses}
                 />
               ))}
-            {tab === 'capacity' && <QaCapacityPage onNotify={showToast} />}
+            {tab === 'capacity' && (
+              <Suspense fallback={<Spinner label="Loading page…" />}>
+                <QaCapacityPage onNotify={showToast} />
+              </Suspense>
+            )}
             {tab === 'team' && (
               <TeamPage
                 issues={issues}

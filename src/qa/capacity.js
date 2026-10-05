@@ -1,6 +1,8 @@
 // QA Capacity Planner — pure planning engine.
-// 1 point = 1 hour. Default capacity: 8 points per working day (Mon–Fri).
+// 1 point = 1 hour. Default capacity: 8 points per working day (WORK_DAYS).
 // A user-month plan: { capacity: { 'YYYY-MM-DD': n }, days: { 'YYYY-MM-DD': [ {key, points, delayed?} ] } }
+
+import { workDaySet } from '../utils/workDays.js'
 
 const DEFAULT_CAPACITY = 8
 
@@ -9,10 +11,8 @@ export const dateKey = (d) =>
 
 export const monthKey = (d) => dateKey(d).slice(0, 7)
 
-export const isWeekend = (key) => {
-  const d = new Date(key + 'T12:00:00')
-  return d.getDay() === 0 || d.getDay() === 6
-}
+// A day outside the configured WORK_DAYS (default: weekends off).
+export const isDayOff = (key) => !workDaySet().has(new Date(key + 'T12:00:00').getDay())
 
 // All date keys of a month ('YYYY-MM').
 export function monthDays(mKey) {
@@ -24,11 +24,11 @@ export function monthDays(mKey) {
   return out
 }
 
-// Capacity of one day: explicit override wins; weekends default to 0.
+// Capacity of one day: explicit override wins; non-work days default to 0.
 export function capacityOf(plan, day) {
   const o = plan?.capacity?.[day]
   if (o != null) return o
-  return isWeekend(day) ? 0 : DEFAULT_CAPACITY
+  return isDayOff(day) ? 0 : DEFAULT_CAPACITY
 }
 
 export const plannedOn = (plan, day) =>

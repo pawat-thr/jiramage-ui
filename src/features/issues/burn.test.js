@@ -1,5 +1,7 @@
-import { describe, it, expect } from 'vitest'
-import { workingMandays, burnIntervals, intervalMandays, isBurnStatus } from './burn.js'
+import { describe, it, expect, afterEach } from 'vitest'
+import { workingMandays, workWindows, burnIntervals, intervalMandays, isBurnStatus } from './burn.js'
+import { CFG } from '../../config/appConfig.js'
+import { parseWorkTime, parseWorkDays, DEFAULT_WORK_TIME } from '../../config/configFields.js'
 
 // 2026-09-07 is a Monday
 const D = (s) => new Date(s)
@@ -71,5 +73,56 @@ describe('burnIntervals / isBurnStatus', () => {
   it('status match is case-insensitive', () => {
     expect(isBurnStatus('in dev')).toBe(true)
     expect(isBurnStatus('Done')).toBe(false)
+  })
+})
+
+describe('configurable work time (WORK_TIME)', () => {
+  const orig = CFG.workTime
+  afterEach(() => {
+    CFG.workTime = orig
+  })
+
+  it('parseWorkTime accepts windows and rejects garbage', () => {
+    expect(parseWorkTime('09:30-12:00,13:00-18:30')).toHaveLength(2)
+    expect(parseWorkTime(' 9:00 - 17:00 ')).toHaveLength(1)
+    for (const bad of ['', 'nine to five', '09:30-12', '12:00-12:00', '13:00-09:00', '25:00-26:00']) {
+      expect(parseWorkTime(bad)).toBeNull()
+    }
+  })
+
+  it('workWindows derives hours/day from the configured windows', () => {
+    expect(workWindows(DEFAULT_WORK_TIME).hoursPerDay).toBe(8)
+    expect(workWindows('09:00-17:00').hoursPerDay).toBe(8)
+    expect(workWindows('10:00-12:00,13:00-16:00').hoursPerDay).toBe(5)
+  })
+
+  it('invalid WORK_TIME falls back to the default windows', () => {
+    expect(workWindows('nonsense')).toEqual(workWindows(DEFAULT_WORK_TIME))
+  })
+
+  it('workingMandays follows CFG.workTime (1 full custom day = 1 manday)', () => {
+    CFG.workTime = '10:00-12:00,13:00-16:00' // 5h day
+    expect(workingMandays('2026-09-07T10:00:00', new Date('2026-09-07T16:00:00'))).toBeCloseTo(1, 5)
+    expect(workingMandays('2026-09-07T10:00:00', new Date('2026-09-07T12:30:00'))).toBeCloseTo(2 / 5, 5)
+  })
+})
+
+describe('configurable work days (WORK_DAYS)', () => {
+  const orig = CFG.workDays
+  afterEach(() => {
+    CFG.workDays = orig
+  })
+
+  it('parseWorkDays accepts names (3-letter or full, any case), rejects garbage', () => {
+    expect(parseWorkDays('Mon,Tue,Wed,Thu,Fri')).toEqual([1, 2, 3, 4, 5])
+    expect(parseWorkDays('saturday, SUNDAY')).toEqual([0, 6])
+    expect(parseWorkDays('mon, mon')).toEqual([1]) // deduped
+    for (const bad of ['', 'someday', 'mon,xx']) expect(parseWorkDays(bad)).toBeNull()
+  })
+
+  it('burn counts a configured Saturday as working time', () => {
+    CFG.workDays = 'Mon,Tue,Wed,Thu,Fri,Sat'
+    // Fri 18:30 → Mon 09:30 now includes Saturday's full 8h = 1 manday
+    expect(workingMandays('2026-09-04T18:30:00', new Date('2026-09-07T09:30:00'))).toBeCloseTo(1, 5)
   })
 })

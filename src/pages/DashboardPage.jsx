@@ -9,7 +9,7 @@ import SubtaskPoints from '../features/dashboard/SubtaskPoints.jsx'
 import { memberStats, statusStats, typeStats, summaryStats, activeSubtaskPoints } from '../features/dashboard/aggregate.js'
 import { useBurn } from '../features/issues/useBurn.js'
 import { CFG } from '../config/appConfig.js'
-import { chip, toolbar } from '../utils/ui.js'
+import { toolbar } from '../utils/ui.js'
 
 export default function DashboardPage({ teamIssues, myIssues, onRefresh, refreshing, onPickMember, memberEmails, burnStatuses }) {
   const members = useMemo(() => memberStats(teamIssues || [], memberEmails), [teamIssues, memberEmails])

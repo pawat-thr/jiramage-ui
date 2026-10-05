@@ -1,13 +1,14 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import StatusBadge from '../../components/common/StatusBadge.jsx'
 import Spinner from '../../components/common/Spinner.jsx'
 import AdfContent from './AdfContent.jsx'
 import { releaseNames } from './releaseNames.js'
-import { avatarColor, initials } from '../pr/prConstants.js'
-import { fetchIssueDetail, fetchSubtasks, browseUrl } from '../../services/jiraApi.js'
-import { shortName } from '../../utils/format.js'
-import { CFG } from '../../config/appConfig.js'
+import { fetchIssueDetail, fetchSubtasks, addComment, setPoints, uploadAttachments, resolveAccountIds, browseUrl, MENTION_RE } from '../../services/jiraApi.js'
+import { MentionTextarea } from '../pr/mentions.jsx'
+import { shortName, emailUsername } from '../../utils/format.js'
+import { CFG, teamMembers } from '../../config/appConfig.js'
 import { card, emptyState } from '../../utils/ui.js'
+import Avatar from '../../components/common/Avatar.jsx'
 
 const fmtDate = (iso) => (iso ? new Date(iso).toLocaleString() : '—')
 
@@ -25,12 +26,7 @@ function Person({ user }) {
   const name = shortName(user.displayName || '')
   return (
     <span className="flex items-center gap-1.5">
-      <span
-        className="grid size-5 place-items-center rounded-full text-[10px] font-bold text-bg"
-        style={{ background: avatarColor(user.emailAddress || user.displayName) }}
-      >
-        {initials(name)}
-      </span>
+      <Avatar id={user.emailAddress || user.displayName} name={name} className="grid size-5 place-items-center rounded-full text-[10px] font-bold text-bg" />
       {name}
     </span>
   )
@@ -64,6 +60,13 @@ export default function StoryDetail({ storyKey, onBack, hideBack = false, backLa
       mounted = false
     }
   }, [storyKey])
+
+  // Silent refetch after a write (comment / points) — keeps the view in
+  // place instead of flashing the loading spinner.
+  const reload = () =>
+    fetchIssueDetail(storyKey)
+      .then(setIssue)
+      .catch(() => {})
 
   if (error) {
     return (
@@ -115,10 +118,16 @@ export default function StoryDetail({ storyKey, onBack, hideBack = false, backLa
         <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
           <Meta label="Type">{f.issuetype?.name}</Meta>
           <Meta label="Priority">{f.priority?.name}</Meta>
-          {f[CFG.pointField] != null && (
+          {f.issuetype?.subtask ? (
             <Meta label="Points">
-              <span className="tabular-nums">{Number(f[CFG.pointField])}</span>
+              <PointsEditor issueKey={issue.key} value={f[CFG.pointField]} onSaved={reload} />
             </Meta>
+          ) : (
+            f[CFG.pointField] != null && (
+              <Meta label="Points">
+                <span className="tabular-nums">{Number(f[CFG.pointField])}</span>
+              </Meta>
+            )
           )}
           {f.parent && (
             <Meta label="Parent story">
@@ -239,12 +248,7 @@ export default function StoryDetail({ storyKey, onBack, hideBack = false, backLa
             const who = shortName(c.author?.displayName || 'user')
             return (
               <div key={c.id} className="flex gap-3">
-                <span
-                  className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-full text-xs font-bold text-bg"
-                  style={{ background: avatarColor(c.author?.emailAddress || who) }}
-                >
-                  {initials(who)}
-                </span>
+                <Avatar id={c.author?.emailAddress || who} name={who} className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-full text-xs font-bold text-bg" />
                 <div className="min-w-0 flex-1 rounded-2xl rounded-tl-sm border border-line bg-field px-4 py-2.5">
                   <div className="flex items-baseline justify-between gap-2">
                     <span className="text-[13px] font-semibold text-ink">{who}</span>
@@ -258,6 +262,184 @@ export default function StoryDetail({ storyKey, onBack, hideBack = false, backLa
             )
           })}
         </div>
+        <CommentBox issueKey={issue.key} onPosted={reload} />
+      </div>
+    </div>
+  )
+}
+
+// Inline story-point editor for subtasks — writes as the API-token user.
+function PointsEditor({ issueKey, value, onSaved }) {
+  const [editing, setEditing] = useState(false)
+  const [val, setVal] = useState(value ?? '')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState(null)
+
+  const save = async () => {
+    if (busy) return // Enter can repeat — never fire parallel PUTs
+    setBusy(true)
+    setErr(null)
+    try {
+      await setPoints(issueKey, val)
+      await onSaved()
+      setEditing(false)
+    } catch (e) {
+      setErr(e.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (!editing)
+    return (
+      <span className="flex items-center gap-2">
+        <span className="tabular-nums">{value != null ? Number(value) : '—'}</span>
+        <button
+          className="rounded-full border border-line bg-field px-2.5 py-[1px] text-xs text-ink-soft hover:border-accent hover:text-accent-bright"
+          title="Change the story-point estimate in Jira (as the API-token user)"
+          onClick={() => {
+            setVal(value ?? '')
+            setEditing(true)
+          }}
+        >
+          edit
+        </button>
+      </span>
+    )
+  return (
+    <span className="flex items-center gap-1.5">
+      <input
+        type="number"
+        min="0"
+        step="0.5"
+        autoFocus
+        className="w-20 rounded-lg border border-line bg-field px-2 py-1 text-sm text-ink focus:border-accent"
+        value={val}
+        onChange={(e) => setVal(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') save()
+          if (e.key === 'Escape') setEditing(false)
+        }}
+      />
+      <button
+        disabled={busy}
+        className="rounded-full border border-accent bg-accent-soft px-2.5 py-1 text-xs font-semibold text-accent-bright hover:bg-accent hover:text-bg disabled:opacity-50"
+        onClick={save}
+      >
+        {busy ? '…' : 'Save'}
+      </button>
+      <button className="text-xs text-muted hover:text-ink" onClick={() => setEditing(false)}>
+        cancel
+      </button>
+      {err && <span className="text-xs text-danger">{err}</span>}
+    </span>
+  )
+}
+
+// Everyone @mentionable in a Jira comment: dev roster + the QA team.
+const mentionCandidates = () => {
+  const seen = new Set()
+  return [...teamMembers(), ...CFG.qaEmails]
+    .filter((e) => !seen.has(e.toLowerCase()) && seen.add(e.toLowerCase()))
+    .map((email) => ({ email, name: emailUsername(email) }))
+}
+
+// Comment composer — works on EVERY issue type; posts as the API-token user.
+// @names become real Jira mentions (the person gets notified by Jira);
+// pictures (file picker or paste) upload as issue attachments and embed in
+// the comment, falling back to a "📎 name" reference if Jira rejects the embed.
+function CommentBox({ issueKey, onPosted }) {
+  const [text, setText] = useState('')
+  const [files, setFiles] = useState([])
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState(null)
+  const fileRef = useRef(null)
+  const candidates = mentionCandidates()
+
+  const addFiles = (list) => {
+    const imgs = [...list].filter((f) => f.type.startsWith('image/'))
+    if (imgs.length) setFiles((cur) => [...cur, ...imgs])
+  }
+
+  const post = async () => {
+    if ((!text.trim() && !files.length) || busy) return
+    setBusy(true)
+    setErr(null)
+    try {
+      // 1) pictures → issue attachments
+      let images = []
+      if (files.length) {
+        const uploaded = await uploadAttachments(issueKey, files)
+        images = uploaded.map((a) => ({ filename: a.filename, url: a.content }))
+      }
+      // 2) @names → accountIds (only names that match a known member)
+      const names = [...new Set([...text.matchAll(MENTION_RE)].map((m) => m[1].toLowerCase()))]
+      const hit = candidates.filter((c) => names.includes(c.name.toLowerCase()))
+      const ids = hit.length ? await resolveAccountIds(hit.map((c) => c.email)) : {}
+      const mentions = Object.fromEntries(
+        hit.filter((c) => ids[c.email]).map((c) => [c.name.toLowerCase(), { id: ids[c.email] }]),
+      )
+      // 3) post — if Jira rejects the embedded media, repost with 📎 references
+      try {
+        await addComment(issueKey, text.trim(), { mentions, images })
+      } catch (e) {
+        if (!images.length || !/HTTP 400/.test(e.message)) throw e
+        const refs = images.map((i) => `📎 ${i.filename}`).join('\n')
+        await addComment(issueKey, `${text.trim()}\n${refs}`.trim(), { mentions })
+      }
+      setText('')
+      setFiles([])
+      await onPosted()
+    } catch (e) {
+      setErr(e.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="mt-4 border-t border-line pt-4">
+      <MentionTextarea
+        className="min-h-16 w-full resize-y rounded-xl border border-line bg-field px-3.5 py-2 text-sm text-ink placeholder:text-muted focus:border-accent"
+        placeholder={`Comment on ${issueKey}… @name to mention · paste a screenshot to attach · Ctrl/⌘+Enter posts`}
+        value={text}
+        setValue={setText}
+        onPost={post}
+        disabled={busy}
+        candidates={candidates}
+        onPaste={(e) => addFiles(e.clipboardData?.files || [])}
+      />
+      {files.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {files.map((f, i) => (
+            <span key={i} className="inline-flex items-center gap-1.5 rounded-full border border-line bg-field px-2.5 py-1 text-xs text-ink-soft">
+              🖼 {f.name}
+              <button className="text-muted hover:text-danger" title="Remove" onClick={() => setFiles((cur) => cur.filter((_, j) => j !== i))}>
+                ✕
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="mt-2 flex items-center justify-between gap-2">
+        <span className="flex items-center gap-2 text-xs text-muted">
+          <button
+            className="rounded-full border border-line bg-field px-2.5 py-1 text-xs text-ink-soft hover:border-accent hover:text-accent-bright"
+            title="Attach picture(s) — uploaded to the Jira card with the comment"
+            onClick={() => fileRef.current?.click()}
+          >
+            🖼 Add picture
+          </button>
+          <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => { addFiles(e.target.files); e.target.value = '' }} />
+          {err ? <span className="text-danger">{err}</span> : <>Posts to Jira as <strong>{CFG.email}</strong> (the API-token user).</>}
+        </span>
+        <button
+          disabled={(!text.trim() && !files.length) || busy}
+          className="rounded-full border border-accent bg-accent-soft px-4 py-1.5 text-[13px] font-semibold text-accent-bright transition-colors hover:bg-accent hover:text-bg disabled:cursor-not-allowed disabled:opacity-50"
+          onClick={post}
+        >
+          {busy ? 'Posting…' : 'Post comment'}
+        </button>
       </div>
     </div>
   )

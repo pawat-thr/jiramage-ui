@@ -233,3 +233,9 @@
   --c-accent-bright: #79b8f7;
   --c-accent-soft: #14293d;
 }
+
+/* Capacity Planner hover-trace: applied imperatively (see traceTask) so
+   hovering never re-renders the table. */
+.task-hover {
+  box-shadow: 0 0 0 2px var(--color-accent);
+}

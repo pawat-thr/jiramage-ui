@@ -22,8 +22,8 @@
 ## Hard rules (user-set — do not violate)
 
 1. **The beta-era unit-test freeze is OVER** (lifted at the 0.1.8 release):
-   new features should come with tests again. Suite at 0.1.8: 180 unit tests /
-   29 files + 16 e2e smoke checks.
+   new features should come with tests again. Suite now: 200 unit tests /
+   32 files + 16 e2e smoke checks.
 2. **User commits themselves.** Never commit/push unless explicitly asked.
 3. **.env edits: only append complete lines at the END of the file.** A splice
    once corrupted the user's QA_EMAILS line — never edit mid-file.
@@ -37,7 +37,7 @@
 
 ## How to verify work (established pattern)
 
-- `npm run build` then `npm test -- --run` (**180 tests / 29 files** must stay
+- `npm run build` then `npm test -- --run` (**200 tests / 32 files** must stay
   green) then `npm run test:e2e` (16-check headless-Chrome smoke suite;
   data-dependent checks auto-skip with `[skip]` when the team has zero active
   subtasks).
@@ -94,8 +94,9 @@
   group renders ≤50 rows + "Show 50 more"/"Show all", header click collapses
   group (fixed 3,000-row endless scroll). BurnMeter lives here.
 - `src/features/issues/useBurn.js` + `burn.js` — burn tracking from Jira
-  changelogs: interval-based (status ping-pong safe), working time hardcoded
-  Mon–Fri 9:30–12:00 + 13:00–18:30 (8h; Settings option planned), 1 manday =
+  changelogs: interval-based (status ping-pong safe), working schedule from
+  `WORK_TIME` + `WORK_DAYS` config (default Mon–Fri 9:30–12:00 + 13:00–18:30;
+  WORK_DAYS also drives planner day-off capacity via isDayOff), 1 manday =
   8 pt; finished stats subtask-only, 150-fetch cap, progressive render;
   localStorage cache `jiramage-burn-intervals-v2`. Status sets from env:
   `BURN_STATUSES`, `BURN_FINISHED_STATUSES`, `QA_BURN_STATUSES=In Progress`,
@@ -106,6 +107,9 @@
   `settings/config/history` (both published). Any NEW block needs a republish
   reminder to the user.
 - `e2e/smoke.mjs` — the 16-check suite; spawns its own vite on port 5199.
+- Pages are LAZY chunks (React.lazy in App.jsx/QaApp.jsx) + manualChunks for
+  react/firebase vendors — keep new pages lazy; planner hover uses imperative
+  `traceTask` (data-task-trace + .task-hover class), never hover state.
 
 ## Current state (v0.1.8 FINAL tagged, all verified green)
 

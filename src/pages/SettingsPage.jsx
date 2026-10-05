@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { CFG, teamMembers } from '../config/appConfig.js'
 import { card, cx } from '../utils/ui.js'
 import { useTheme } from '../hooks/useTheme.js'
@@ -15,6 +15,8 @@ import {
   DEFAULT_PROMPT_TEMPLATE,
 } from '../services/settingsApi.js'
 import PasswordField from '../components/common/PasswordField.jsx'
+import Avatar from '../components/common/Avatar.jsx'
+import { fileToAvatar, saveMyPhoto, removeMyPhoto, photoOf, subscribeProfiles, startProfiles } from '../services/profilesApi.js'
 import {
   CONFIG_FIELDS,
   cfgToRaw,
@@ -158,10 +160,82 @@ function ChangePassword({ onNotify }) {
 
 const THEME_LABELS = { light: 'Light', dark: 'Dark', system: 'System' }
 
+// Profile picture: team mode saves to Firestore (whole team sees it);
+// individual mode saves to this browser. No photo = the initials avatar.
+function ProfilePhoto({ onNotify, user }) {
+  const email = user?.email || CFG.email
+  useEffect(() => startProfiles(), [])
+  const photo = useSyncExternalStore(subscribeProfiles, () => photoOf(email))
+  const [busy, setBusy] = useState(false)
+  const fileRef = useRef(null)
+
+  const upload = async (file) => {
+    if (!file) return
+    setBusy(true)
+    try {
+      const dataUrl = await fileToAvatar(file)
+      await saveMyPhoto(email, dataUrl)
+      onNotify(firebaseEnabled ? '✓ Profile picture saved — the whole team sees it' : '✓ Profile picture saved to this browser')
+    } catch (err) {
+      onNotify(err.message, true)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-4">
+      <Avatar
+        id={email}
+        name={emailUsername(email)}
+        className="grid size-16 place-items-center rounded-full text-xl font-bold text-bg"
+      />
+      <div className="grid gap-1.5">
+        <div className="flex gap-2">
+          <button
+            disabled={busy}
+            className="rounded-full border border-accent bg-accent-soft px-4 py-1.5 text-[13px] font-semibold text-accent-bright transition-colors hover:bg-accent hover:text-bg disabled:opacity-60"
+            onClick={() => fileRef.current?.click()}
+          >
+            {busy ? 'Saving…' : photo ? 'Change picture' : 'Upload picture'}
+          </button>
+          {photo && (
+            <button
+              className="rounded-full border border-line bg-field px-4 py-1.5 text-[13px] text-ink-soft hover:border-danger hover:text-danger"
+              onClick={async () => {
+                try {
+                  await removeMyPhoto(email)
+                  onNotify('✓ Back to the initials avatar')
+                } catch (e) {
+                  onNotify(e.message, true)
+                }
+              }}
+            >
+              Remove
+            </button>
+          )}
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            hidden
+            onChange={(e) => { upload(e.target.files?.[0]); e.target.value = '' }}
+          />
+        </div>
+        <p className="text-xs text-muted">
+          Cropped square, resized to 128px.{' '}
+          {firebaseEnabled ? 'Shown to the whole team everywhere avatars appear.' : 'Saved to this browser (no Firebase).'}{' '}
+          No picture = your initials avatar.
+        </p>
+      </div>
+    </div>
+  )
+}
+
 // Movable team config: Firestore (settings/config) overrides .env per field.
 // Empty input = no override → the .env value (shown as placeholder) applies.
 // Saving reloads the page so the overlay re-applies everywhere.
-function TeamConfig({ onNotify, user }) {
+export function TeamConfig({ onNotify, user }) {
   const [saved, setSaved] = useState(null) // stored doc (null = loading)
   const [draft, setDraft] = useState({})
   const [busy, setBusy] = useState(false)
@@ -231,6 +305,7 @@ function TeamConfig({ onNotify, user }) {
               </span>
             </div>
             <input
+              aria-label={f.env}
               className={cx(editable, errors[f.env] && 'border-danger')}
               value={valueOf(f)}
               placeholder={envRawOf(f) ? `.env: ${envRawOf(f)}` : '(not set in .env)'}
@@ -403,6 +478,10 @@ export default function SettingsPage({ onNotify, user }) {
         title="Your settings"
         hint="These are yours to change — saved instantly, no restart needed."
       />
+
+      <Section title="Profile">
+        <ProfilePhoto onNotify={onNotify} user={user} />
+      </Section>
 
       <Section title="Display">
         <div>

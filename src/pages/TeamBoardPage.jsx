@@ -6,7 +6,7 @@ import TaskForm from '../features/board/TaskForm.jsx'
 import LabelForm from '../features/board/LabelForm.jsx'
 import TaskDetail from '../features/board/TaskDetail.jsx'
 import { TaskStatusBadge } from '../features/board/boardConstants.jsx'
-import { avatarColor, initials } from '../features/pr/prConstants.js'
+import { avatarColor } from '../features/pr/prConstants.js'
 import {
   watchLabels,
   watchTasks,
@@ -20,6 +20,7 @@ import {
 import { firebaseEnabled } from '../services/firebase.js'
 import { emailUsername, todayLocalISO } from '../utils/format.js'
 import { card, chip, cx, toolbar, emptyState } from '../utils/ui.js'
+import Avatar from '../components/common/Avatar.jsx'
 
 export default function TeamBoardPage({ user, onNotify }) {
   const [labels, setLabels] = useState(null)
@@ -186,14 +187,12 @@ export default function TeamBoardPage({ user, onNotify }) {
                         <div className="mt-2.5 flex items-center justify-between gap-2">
                           <span className="flex -space-x-1.5">
                             {(t.users || []).map((email) => (
-                              <span
+                              <Avatar
                                 key={email}
-                                title={emailUsername(email)}
+                                id={email}
+                                name={emailUsername(email)}
                                 className="grid size-6 place-items-center rounded-full border-2 border-panel text-[10px] font-bold text-bg"
-                                style={{ background: avatarColor(email) }}
-                              >
-                                {initials(emailUsername(email))}
-                              </span>
+                              />
                             ))}
                             {!(t.users || []).length && <span className="text-xs text-muted">no users</span>}
                           </span>

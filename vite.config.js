@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { execSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
-import { parseInterval, list } from './src/config/configFields.js'
+import { parseInterval, list, DEFAULT_WORK_TIME, DEFAULT_WORK_DAYS } from './src/config/configFields.js'
 
 // Short git commit hash for the build code (Minecraft-snapshot style),
 // e.g. v0.1.7+a3f9c2d. Falls back to "dev" outside a git checkout.
@@ -43,6 +43,9 @@ export default defineConfig(({ mode }) => {
         projects: list(env.JIRA_PROJECT, true),
         teamFrom: (env.JIRA_TEAM_FROM || '2024-05-01').trim(),
         refreshMs: parseInterval(env.REFRESH_INTERVAL) ?? 5 * 60 * 1000,
+        // Burn working windows (Mon\u2013Fri); invalid values fall back at parse time.
+        workTime: (env.WORK_TIME || DEFAULT_WORK_TIME).trim(),
+        workDays: (env.WORK_DAYS || DEFAULT_WORK_DAYS).trim(),
         // Jira custom field id holding the "Release" on a card (option field).
         releaseField: (env.JIRA_RELEASE_FIELD || 'customfield_10127').trim(),
         // Jira custom field id holding story points (number field).
@@ -74,6 +77,17 @@ export default defineConfig(({ mode }) => {
           ? list(env.INTEGRATION_ROLES)
           : ['BE', 'WEB', 'MOB'],
       }),
+    },
+    build: {
+      rollupOptions: {
+        output: {
+          // stable vendor chunks: app updates don't re-download React/Firebase
+          manualChunks: {
+            react: ['react', 'react-dom', 'react-router-dom'],
+            firebase: ['firebase/app', 'firebase/auth', 'firebase/firestore'],
+          },
+        },
+      },
     },
     test: {
       environment: 'jsdom',

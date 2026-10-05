@@ -1,5 +1,5 @@
-import { avatarColor, initials } from '../pr/prConstants.js'
 import { card, emptyState } from '../../utils/ui.js'
+import Avatar from '../../components/common/Avatar.jsx'
 
 const fmtPts = (n) => (n % 1 ? n.toFixed(1) : String(n))
 
@@ -63,12 +63,7 @@ export default function SubtaskPoints({ rows, memberBurn = {} }) {
               >
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="flex min-w-0 items-center gap-2 text-[13px] font-medium text-ink">
-                    <span
-                      className="grid size-6 shrink-0 place-items-center rounded-full text-[10px] font-bold text-bg"
-                      style={{ background: avatarColor(r.key) }}
-                    >
-                      {initials(r.name)}
-                    </span>
+                    <Avatar id={r.key} name={r.name} className="grid size-6 shrink-0 place-items-center rounded-full text-[10px] font-bold text-bg" />
                     <span className="truncate">
                       {r.name}
                       {r.isMe && <span className="font-normal text-muted"> (me)</span>}

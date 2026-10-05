@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import Sidebar from './components/layout/Sidebar.jsx'
 import TopBar from './components/layout/TopBar.jsx'
@@ -6,17 +6,19 @@ import Toast from './components/common/Toast.jsx'
 import TransitionModal from './features/issues/TransitionModal.jsx'
 import ReassignModal from './features/issues/ReassignModal.jsx'
 import DashboardPage from './pages/DashboardPage.jsx'
-import MyTasksPage from './pages/MyTasksPage.jsx'
-import TeamPage from './pages/TeamPage.jsx'
-import TeamBoardPage from './pages/TeamBoardPage.jsx'
-import DeliveryPage from './pages/DeliveryPage.jsx'
-import PrBoardPage from './pages/PrBoardPage.jsx'
-import InboxPage from './pages/InboxPage.jsx'
-import IntegrationPage from './pages/IntegrationPage.jsx'
-import SubtaskGenPage from './pages/SubtaskGenPage.jsx'
-import QaCapacityPage from './qa/QaCapacityPage.jsx'
-import SettingsPage from './pages/SettingsPage.jsx'
 import LoginPage from './pages/LoginPage.jsx'
+// Every other page is its own lazy chunk: first paint ships only the shell +
+// dashboard; a page's code downloads on first visit (and is then cached).
+const MyTasksPage = lazy(() => import('./pages/MyTasksPage.jsx'))
+const TeamPage = lazy(() => import('./pages/TeamPage.jsx'))
+const TeamBoardPage = lazy(() => import('./pages/TeamBoardPage.jsx'))
+const DeliveryPage = lazy(() => import('./pages/DeliveryPage.jsx'))
+const PrBoardPage = lazy(() => import('./pages/PrBoardPage.jsx'))
+const InboxPage = lazy(() => import('./pages/InboxPage.jsx'))
+const IntegrationPage = lazy(() => import('./pages/IntegrationPage.jsx'))
+const SubtaskGenPage = lazy(() => import('./pages/SubtaskGenPage.jsx'))
+const QaCapacityPage = lazy(() => import('./qa/QaCapacityPage.jsx'))
+const SettingsPage = lazy(() => import('./pages/SettingsPage.jsx'))
 import Spinner from './components/common/Spinner.jsx'
 import { useJiraData } from './hooks/useJiraData.js'
 import { useToast } from './hooks/useToast.js'
@@ -263,6 +265,7 @@ function AppShell({ user, onLogout }) {
         <main className="flex-1 p-4 md:p-6">
           {/* key={tab} remounts the wrapper so the enter animation replays on page change */}
           <div key={tab} className="animate-enter">
+          <Suspense fallback={<Spinner label="Loading page…" />}>
           {tab === 'dashboard' && (
             <DashboardPage
               teamIssues={teamIssues}
@@ -325,6 +328,7 @@ function AppShell({ user, onLogout }) {
           )}
           {tab === 'inbox' && <InboxPage user={user} onNotify={showToast} />}
           {tab === 'settings' && <SettingsPage onNotify={showToast} user={user} />}
+          </Suspense>
           </div>
         </main>
       </div>

@@ -1,8 +1,8 @@
 import { useRef, useState } from 'react'
-import { CFG, teamMembers } from '../../config/appConfig.js'
+import { teamMembers } from '../../config/appConfig.js'
 import { emailUsername } from '../../utils/format.js'
-import { avatarColor, initials } from './prConstants.js'
 import { cx } from '../../utils/ui.js'
+import Avatar from '../../components/common/Avatar.jsx'
 
 // Everyone who can be @mentioned: the whole team, addressed by email username
 // (e.g. @tanawat.k for tanawat.k@orbitdigital.co.th).
@@ -11,7 +11,7 @@ const MENTIONABLE = teamMembers().map((email) => ({
   name: emailUsername(email),
 }))
 
-const MENTION_RE = /@([a-z0-9][a-z0-9._-]*)/gi
+import { MENTION_RE } from '../../services/jiraApi.js'
 
 // Emails of members @mentioned in a comment body.
 export function extractMentionEmails(text) {
@@ -44,13 +44,13 @@ export function MentionText({ text }) {
 
 // Textarea with @mention autocomplete: type "@" to get a member dropdown,
 // arrows/Enter/Tab to pick, Esc to dismiss. ⌘/Ctrl+Enter still posts.
-export function MentionTextarea({ value, setValue, onPost, disabled, placeholder, className }) {
+export function MentionTextarea({ value, setValue, onPost, disabled, placeholder, className, candidates = MENTIONABLE, onPaste }) {
   const ref = useRef(null)
   const [sug, setSug] = useState(null) // { query, start } — start = index right after "@"
   const [idx, setIdx] = useState(0)
 
   const options = sug
-    ? MENTIONABLE.filter((o) => o.name.toLowerCase().startsWith(sug.query)).slice(0, 6)
+    ? candidates.filter((o) => o.name.toLowerCase().startsWith(sug.query)).slice(0, 6)
     : []
 
   const refresh = (el) => {
@@ -116,6 +116,7 @@ export function MentionTextarea({ value, setValue, onPost, disabled, placeholder
         onKeyDown={onKeyDown}
         onClick={(e) => refresh(e.target)}
         onBlur={() => setTimeout(() => setSug(null), 150)}
+        onPaste={onPaste}
       />
       {options.length > 0 && (
         <div className="absolute bottom-full left-3 z-30 mb-1 max-h-56 w-60 max-w-[calc(100vw-4rem)] overflow-y-auto rounded-xl border border-line bg-panel shadow-lift">
@@ -133,12 +134,7 @@ export function MentionTextarea({ value, setValue, onPost, disabled, placeholder
                 pick(o)
               }}
             >
-              <span
-                className="grid size-6 shrink-0 place-items-center rounded-full text-[10px] font-bold text-bg"
-                style={{ background: avatarColor(o.email) }}
-              >
-                {initials(o.name)}
-              </span>
+              <Avatar id={o.email} name={o.name} className="grid size-6 shrink-0 place-items-center rounded-full text-[10px] font-bold text-bg" />
               @{o.name}
             </button>
           ))}

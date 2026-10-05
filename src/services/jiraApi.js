@@ -152,6 +152,85 @@ export function assignIssue(issueKey, accountId) {
   })
 }
 
+// One paragraph's inline nodes: plain text, with known @names becoming REAL
+// ADF mention nodes (Jira then notifies the mentioned user).
+// `mentions`: { lowercaseName: { id: <accountId> } }
+// THE mention token — shared by the autocomplete (mentions.jsx), the
+// composer's resolver (StoryDetail) and the ADF builder below, so all three
+// always tokenize identically.
+export const MENTION_RE = /@([a-z0-9][a-z0-9._-]*)/gi
+
+const lineNodes = (line, mentions) => {
+  if (!line) return []
+  const out = []
+  let last = 0
+  for (const m of line.matchAll(MENTION_RE)) {
+    const hit = mentions[m[1].toLowerCase()]
+    if (!hit?.id) continue
+    if (m.index > last) out.push({ type: 'text', text: line.slice(last, m.index) })
+    out.push({ type: 'mention', attrs: { id: hit.id, text: '@' + m[1] } })
+    last = m.index + m[0].length
+  }
+  if (last < line.length) out.push({ type: 'text', text: line.slice(last) })
+  return out
+}
+
+// Plain text -> ADF (paragraphs split on newlines) for comment posts.
+export const textToAdf = (text, mentions = {}) => ({
+  type: 'doc',
+  version: 1,
+  content: String(text)
+    .split('\n')
+    .map((line) => ({ type: 'paragraph', content: lineNodes(line, mentions) })),
+})
+
+// Comment body: text (+mentions) followed by one media block per uploaded
+// image — `type: 'external'` + the attachment's content URL, with `alt` set
+// to the filename so OUR renderer (AdfContent) matches it to the attachment
+// list and streams it through the proxy.
+export const commentAdf = (text, mentions = {}, images = []) => {
+  const doc = textToAdf(text, mentions)
+  for (const img of images) {
+    doc.content.push({
+      type: 'mediaSingle',
+      attrs: { layout: 'center' },
+      content: [{ type: 'media', attrs: { type: 'external', url: img.url, alt: img.filename } }],
+    })
+  }
+  return doc
+}
+
+// Comment on ANY issue type. Writes act as the API-token user (JIRA_EMAIL) —
+// same identity as every other write through the proxy.
+export function addComment(issueKey, text, { mentions = {}, images = [] } = {}) {
+  return jira(`/rest/api/3/issue/${issueKey}/comment`, {
+    method: 'POST',
+    body: { body: commentAdf(text, mentions, images) },
+  })
+}
+
+// Attach files to an issue (multipart — the one call that isn't JSON).
+// Returns the created attachment metadata [{ id, filename, content, mimeType }].
+export async function uploadAttachments(issueKey, files) {
+  const form = new FormData()
+  for (const f of files) form.append('file', f, f.name)
+  const res = await fetch(`/jira/rest/api/3/issue/${issueKey}/attachments`, {
+    method: 'POST',
+    headers: { 'X-Atlassian-Token': 'no-check' },
+    body: form,
+  })
+  if (!res.ok) throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`)
+  return res.json()
+}
+
+// Set the story-point estimate (subtask editing in the detail view).
+export function setPoints(issueKey, points) {
+  return jira(`/rest/api/3/issue/${issueKey}`, {
+    method: 'PUT',
+    body: { fields: { [CFG.pointField]: points === '' || points == null ? null : Number(points) } },
+  })
+}
+
 export async function fetchTransitions(issueKey) {
   const result = await jira(`/rest/api/3/issue/${issueKey}/transitions`)
   return result.transitions || []

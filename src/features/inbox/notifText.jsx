@@ -1,5 +1,6 @@
-import { avatarColor, initials, fmtTime } from '../pr/prConstants.js'
+import { fmtTime } from '../pr/prConstants.js'
 import { emailUsername } from '../../utils/format.js'
+import Avatar from '../../components/common/Avatar.jsx'
 
 // Human-readable message for one notification, shared by the bell dropdown
 // and the Inbox page.
@@ -25,12 +26,7 @@ export function NotifBody({ n }) {
   const who = n.fromName || emailUsername(n.fromEmail)
   return (
     <>
-      <span
-        className="mt-0.5 grid size-10 shrink-0 place-items-center rounded-full text-[13px] font-bold text-bg"
-        style={{ background: avatarColor(n.fromEmail) }}
-      >
-        {initials(who)}
-      </span>
+      <Avatar id={n.fromEmail} name={who} className="mt-0.5 grid size-10 shrink-0 place-items-center rounded-full text-[13px] font-bold text-bg" />
       <span className="min-w-0 flex-1">
         <span className="block text-sm text-ink">
           <strong>{who}</strong> {notifMessage(n)}

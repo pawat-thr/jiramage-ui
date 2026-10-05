@@ -17,6 +17,44 @@ export const list = (raw, upper = false) =>
     .map((s) => (upper ? s.trim().toUpperCase() : s.trim()))
     .filter(Boolean)
 
+// Working time for burn tracking: comma-separated HH:MM-HH:MM windows
+// (Mon-Fri implied; lunch is simply not a window). Parsed leniently — an
+// invalid value falls back to this default rather than breaking burn math.
+export const DEFAULT_WORK_TIME = '09:30-12:00,13:00-18:30'
+
+// '09:30-12:00,13:00-18:30' -> [[{h,m},{h,m}], ...] or null when malformed.
+export function parseWorkTime(str) {
+  const wins = []
+  for (const part of String(str || '').split(',')) {
+    const m = /^\s*(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})\s*$/.exec(part)
+    if (!m) return null
+    const s = { h: +m[1], m: +m[2] }
+    const e = { h: +m[3], m: +m[4] }
+    if (s.h > 23 || e.h > 23 || s.m > 59 || e.m > 59) return null
+    if (e.h * 60 + e.m <= s.h * 60 + s.m) return null
+    wins.push([s, e])
+  }
+  return wins.length ? wins : null
+}
+
+// Working days for burn + capacity planning. Day names, 3-letter or full,
+// case-insensitive. Everything NOT listed is a day off (0 capacity, no burn).
+export const DEFAULT_WORK_DAYS = 'Mon,Tue,Wed,Thu,Fri'
+
+const DAY_INDEX = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 }
+
+// 'Mon,Tue,Fri' -> [1, 2, 5] (sorted, unique) or null when malformed.
+export function parseWorkDays(str) {
+  const out = new Set()
+  for (const part of String(str || '').split(',')) {
+    const t = part.trim().slice(0, 3).toLowerCase()
+    if (!t) continue
+    if (!(t in DAY_INDEX)) return null
+    out.add(DAY_INDEX[t])
+  }
+  return out.size ? [...out].sort() : null
+}
+
 // `required`: rule 4 of the config precedence — no value from Firebase OR
 // .env blocks the app with a config-error screen. Deliberate per product
 // decision (this team always scopes to projects); teamFrom is additionally
@@ -36,6 +74,8 @@ export const CONFIG_FIELDS = [
   { env: 'QA_EMAILS', key: 'qaEmails', kind: 'list', hint: 'QA Mode team emails, comma-separated' },
   { env: 'QA_BURN_STATUSES', key: 'qaBurnStatuses', kind: 'list', hint: 'QA Mode: statuses QA subtasks burn under' },
   { env: 'QA_BURN_FINISHED_STATUSES', key: 'qaBurnFinishedStatuses', kind: 'list', hint: 'QA Mode: post-QA statuses ("used" stat)' },
+  { env: 'WORK_TIME', key: 'workTime', kind: 'worktime', hint: 'burn working windows on work days (e.g. 09:30-12:00,13:00-18:30)' },
+  { env: 'WORK_DAYS', key: 'workDays', kind: 'workdays', hint: 'working days for burn + capacity (e.g. Mon,Tue,Wed,Thu,Fri)' },
 ]
 
 export const parseFieldRaw = (f, raw) =>
@@ -56,6 +96,10 @@ export function validateFieldRaw(f, raw) {
   if (f.kind === 'interval' && parseInterval(v) == null) return `must be ${f.hint}`
   if ((f.kind === 'list' || f.kind === 'listUpper') && !list(v).length)
     return 'must be a comma-separated list'
+  if (f.kind === 'worktime' && !parseWorkTime(v))
+    return 'must be HH:MM-HH:MM windows, comma-separated, each ending after it starts'
+  if (f.kind === 'workdays' && !parseWorkDays(v))
+    return 'must be day names, comma-separated (e.g. Mon,Tue,Wed,Thu,Fri)'
   if (f.pattern && !f.pattern.test(v)) return `must be ${f.patternHint}`
   return null
 }

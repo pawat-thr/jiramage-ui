@@ -10,7 +10,7 @@ import {
   monthKey,
   monthDays,
   dateKey,
-  isWeekend,
+  isDayOff,
   capacityOf,
   plannedOn,
   autoPlace,
@@ -23,26 +23,34 @@ import {
 import { CFG } from '../config/appConfig.js'
 import { emailUsername, uniqueSorted } from '../utils/format.js'
 import { releaseNames } from '../features/story/releaseNames.js'
-import { avatarColor, initials } from '../features/pr/prConstants.js'
+import { avatarColor } from '../features/pr/prConstants.js'
 import { card, cx } from '../utils/ui.js'
+import SharedAvatar from '../components/common/Avatar.jsx'
 
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December']
 
 const input =
   'w-full rounded-xl border border-line bg-field px-3.5 py-2 text-sm text-ink placeholder:text-muted focus:border-accent'
 
+// Hover-tracing a task rings ALL its chunks across the calendar + its dock
+// chip. Done imperatively (data attribute + class toggle) instead of React
+// state — hovering must never re-render the whole planner table.
+const traceTask = (key, on) => {
+  for (const el of document.querySelectorAll(`[data-task-trace="${CSS.escape(key)}"]`)) {
+    el.classList.toggle('task-hover', on)
+  }
+}
+
 const DAY_MIN = 'min-w-[92px]'
 const LEFT_COL = 'sticky left-0 z-10 min-w-[280px] max-w-[280px] border-r border-line bg-panel'
 
 function Avatar({ email, size = 'size-6', text = 'text-[10px]' }) {
   return (
-    <span
-      className={cx('grid shrink-0 place-items-center rounded-full font-bold text-bg', size, text)}
-      style={{ background: avatarColor(email) }}
-      title={emailUsername(email)}
-    >
-      {initials(emailUsername(email))}
-    </span>
+    <SharedAvatar
+      id={email}
+      name={emailUsername(email)}
+      className={cx('grid place-items-center rounded-full font-bold text-bg', size, text)}
+    />
   )
 }
 
@@ -68,7 +76,6 @@ export default function QaCapacityPage({
   const [drag, setDrag] = useState(null)
   const [memberFilter, setMemberFilter] = useState('')
   const [search, setSearch] = useState('')
-  const [hoverTask, setHoverTask] = useState(null)
   const [dockOpen, setDockOpen] = useState(true)
   const [capOpen, setCapOpen] = useState(true)
   const [showUnassigned, setShowUnassigned] = useState(false)
@@ -403,7 +410,7 @@ export default function QaCapacityPage({
                   className={cx(
                     DAY_MIN,
                     'border-b border-l border-line px-1 py-2 text-center text-[13px] font-semibold',
-                    isWeekend(d) ? 'bg-panel-soft/60 text-muted' : 'text-ink-soft',
+                    isDayOff(d) ? 'bg-panel-soft/60 text-muted' : 'text-ink-soft',
                     d === today && 'bg-accent-soft text-accent-bright',
                   )}
                 >
@@ -453,7 +460,7 @@ export default function QaCapacityPage({
                           if (drag?.type === 'task') planTask(drag.task, email, d)
                           setDrag(null)
                         }}
-                        className={cx('border-b border-l border-line p-0.5 text-center', isWeekend(d) && 'bg-panel-soft/60', d === today && 'bg-accent-soft/30')}
+                        className={cx('border-b border-l border-line p-0.5 text-center', isDayOff(d) && 'bg-panel-soft/60', d === today && 'bg-accent-soft/30')}
                       >
                         <button
                           onClick={() => setCapEdit({ email, day: d })}
@@ -494,8 +501,6 @@ export default function QaCapacityPage({
                 today={today}
                 drag={drag}
                 setDrag={setDrag}
-                hoverTask={hoverTask}
-                setHoverTask={setHoverTask}
                 onChunkClick={setChunkEdit}
                 onDetail={setDetailKey}
                 onMoveChunk={moveChunkDay}
@@ -574,12 +579,10 @@ export default function QaCapacityPage({
                           setDrag({ type: 'task', task: t })
                         }}
                         onDragEnd={() => setDrag(null)}
-                        onMouseEnter={() => setHoverTask(t.key)}
-                        onMouseLeave={() => setHoverTask(null)}
-                        className={cx(
-                          'flex cursor-grab items-center gap-2 rounded-lg border border-line border-l-[3px] bg-field px-2.5 py-1.5 text-[12px] text-ink-soft hover:border-accent',
-                          hoverTask === t.key && 'ring-2 ring-accent',
-                        )}
+                        data-task-trace={t.key}
+                        onMouseEnter={() => traceTask(t.key, true)}
+                        onMouseLeave={() => traceTask(t.key, false)}
+                        className="flex cursor-grab items-center gap-2 rounded-lg border border-line border-l-[3px] bg-field px-2.5 py-1.5 text-[12px] text-ink-soft hover:border-accent"
                         style={{ borderLeftColor: avatarColor(t.key) }}
                         title={`${g.storyKey} → ${t.summary}\n${t.left} of ${t.points} pt unplanned · ${t.status} · ${teamLabel}: ${emailUsername(t.assignee || '') || 'none'}`}
                       >
@@ -683,7 +686,7 @@ export default function QaCapacityPage({
 }
 
 // One story group: header row + one row per task (card on the left, chunks across days).
-function StoryGroup({ group, tasks, taskCells, taskOwners, allocated, days, today, drag, setDrag, hoverTask, setHoverTask, onChunkClick, onDetail, onMoveChunk, onQuickRemove }) {
+function StoryGroup({ group, tasks, taskCells, taskOwners, allocated, days, today, drag, setDrag, onChunkClick, onDetail, onMoveChunk, onQuickRemove }) {
   return (
     <>
       <tr>
@@ -704,8 +707,9 @@ function StoryGroup({ group, tasks, taskCells, taskOwners, allocated, days, toda
             <td
               className={cx(LEFT_COL, 'border-b border-l-[3px] px-3 py-1.5')}
               style={{ borderLeftColor: avatarColor(key) }}
-              onMouseEnter={() => setHoverTask(key)}
-              onMouseLeave={() => setHoverTask(null)}
+              data-task-trace={key}
+              onMouseEnter={() => traceTask(key, true)}
+              onMouseLeave={() => traceTask(key, false)}
             >
               <div className="flex items-center gap-1.5">
                 <a className="shrink-0 text-[13px] font-semibold text-accent-bright hover:underline" href={browseUrl(key)} target="_blank" rel="noreferrer">
@@ -747,7 +751,7 @@ function StoryGroup({ group, tasks, taskCells, taskOwners, allocated, days, toda
                   className={cx(
                     DAY_MIN,
                     'border-b border-l border-line p-0.5',
-                    isWeekend(d) && 'bg-panel-soft/60',
+                    isDayOff(d) && 'bg-panel-soft/60',
                     d === today && 'bg-accent-soft/30',
                   )}
                 >
@@ -755,6 +759,7 @@ function StoryGroup({ group, tasks, taskCells, taskOwners, allocated, days, toda
                     <div key={`${c.email}-${c.index}`} className="group/chunk relative">
                       <button
                         draggable
+                        data-task-trace={key}
                         onDragStart={(e) => {
                           e.dataTransfer.setData('text/plain', key)
                           e.dataTransfer.effectAllowed = 'move'
@@ -762,8 +767,8 @@ function StoryGroup({ group, tasks, taskCells, taskOwners, allocated, days, toda
                         }}
                         onDragEnd={() => setDrag(null)}
                         onClick={() => onChunkClick({ email: c.email, day: d, index: c.index })}
-                        onMouseEnter={() => setHoverTask(key)}
-                        onMouseLeave={() => setHoverTask(null)}
+                        onMouseEnter={() => traceTask(key, true)}
+                        onMouseLeave={() => traceTask(key, false)}
                         className={cx(
                           'w-full rounded-md border px-1 py-1.5 text-center text-[13px] font-semibold tabular-nums transition-colors',
                           tasks[key]?.statusCategory === 'done'
@@ -774,7 +779,6 @@ function StoryGroup({ group, tasks, taskCells, taskOwners, allocated, days, toda
                                 ? 'border-blue/40 bg-blue-soft text-blue'
                                 : 'border-line bg-field text-ink-soft',
                           d < today && tasks[key]?.statusCategory !== 'done' && 'opacity-60',
-                          hoverTask === key && 'ring-1 ring-accent',
                           'cursor-grab hover:border-accent',
                         )}
                         title={`${key} · ${c.points} pt on ${d} · ${emailUsername(c.email)}${c.delayed ? ' · DELAYED' : ''}\nclick to edit · drag along the row to another day`}
@@ -876,7 +880,7 @@ function CapacityModal({ email, day, plan, onClose, onSave }) {
       hideFooter
     >
       <div className="grid gap-4">
-        <input type="number" min="0" step="0.5" autoFocus className={input} placeholder={isWeekend(day) ? 'default 0 (weekend)' : 'default 8'} value={value} onChange={(e) => setValue(e.target.value)} />
+        <input type="number" min="0" step="0.5" autoFocus className={input} placeholder={isDayOff(day) ? 'default 0 (day off)' : 'default 8'} value={value} onChange={(e) => setValue(e.target.value)} />
         <div className="flex items-center justify-between gap-2">
           <div className="flex gap-2">
             {[0, 4, 8].map((v) => (

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import ModalShell from '../../components/common/ModalShell.jsx'
 import MemberPicker from '../../components/common/MemberPicker.jsx'
-import { CFG, teamMembers } from '../../config/appConfig.js'
+import { teamMembers } from '../../config/appConfig.js'
 
 const label = 'block text-xs font-medium text-muted mb-1.5'
 const input =

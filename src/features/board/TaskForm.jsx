@@ -5,7 +5,7 @@ import StatusBadge from '../../components/common/StatusBadge.jsx'
 import { ENVS } from './boardConstants.jsx'
 import { avatarColor } from '../pr/prConstants.js'
 import { searchStoriesByText } from '../../services/jiraApi.js'
-import { CFG, teamMembers } from '../../config/appConfig.js'
+import { teamMembers } from '../../config/appConfig.js'
 import { cx, chip } from '../../utils/ui.js'
 
 const label = 'block text-xs font-medium text-muted mb-1.5'

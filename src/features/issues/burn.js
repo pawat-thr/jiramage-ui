@@ -1,32 +1,44 @@
 import { CFG } from '../../config/appConfig.js'
+import { DEFAULT_WORK_TIME, DEFAULT_WORK_DAYS, parseWorkTime, parseWorkDays } from '../../config/configFields.js'
+import { workDaySet } from '../../utils/workDays.js'
 
-// Working time: Mon–Fri, 09:30–12:00 and 13:00–18:30 (2.5h + 5.5h = 8 worked
-// hours/day, lunch excluded). Burn is expressed in MANDAYS (1 manday = 8h).
-// Hardcoded for this beta — a Settings "work time" option comes later.
-
-const WINDOWS = [
-  [{ h: 9, m: 30 }, { h: 12, m: 0 }],
-  [{ h: 13, m: 0 }, { h: 18, m: 30 }],
-]
-const HOURS_PER_DAY = 8
+// Working time comes from WORK_TIME (.env or Firebase team config; default
+// Mon–Fri 09:30–12:00 + 13:00–18:30 = 8 worked hours/day, lunch excluded).
+// Burn is expressed in MANDAYS — 1 manday = one full set of windows — and
+// 1 manday renders as 8 points regardless of the window hours (team scale).
+// Parsed lazily + cached per raw string, so a team-config overlay (which
+// mutates CFG after module load) is always picked up.
+let cacheKey = null
+let cached = null
+export function workWindows(raw = CFG.workTime) {
+  const str = String(raw || '').trim() || DEFAULT_WORK_TIME
+  if (cacheKey !== str) {
+    const windows = parseWorkTime(str) || parseWorkTime(DEFAULT_WORK_TIME)
+    const hoursPerDay = windows.reduce((a, [ws, we]) => a + (we.h * 60 + we.m - ws.h * 60 - ws.m) / 60, 0)
+    cacheKey = str
+    cached = { windows, hoursPerDay }
+  }
+  return cached
+}
 
 const at = (date, { h, m }) => {
   const d = new Date(date)
   d.setHours(h, m, 0, 0)
   return d
 }
-const isWeekend = (d) => d.getDay() === 0 || d.getDay() === 6
+
 
 // Mandays of working time between two datetimes (local timezone).
 export function workingMandays(startISO, end = new Date()) {
   const start = new Date(startISO)
   if (!(start < end)) return 0
+  const { windows, hoursPerDay } = workWindows()
   let hours = 0
   const cursor = new Date(start)
   cursor.setHours(0, 0, 0, 0)
   for (let i = 0; i < 400 && cursor <= end; i++) {
-    if (!isWeekend(cursor)) {
-      for (const [ws, we] of WINDOWS) {
+    if (workDaySet().has(cursor.getDay())) {
+      for (const [ws, we] of windows) {
         const winStart = at(cursor, ws)
         const winEnd = at(cursor, we)
         const from = start > winStart ? start : winStart
@@ -36,7 +48,7 @@ export function workingMandays(startISO, end = new Date()) {
     }
     cursor.setDate(cursor.getDate() + 1)
   }
-  return hours / HOURS_PER_DAY
+  return hours / hoursPerDay
 }
 
 export const isBurnStatus = (name, statuses = CFG.burnStatuses) =>
@@ -79,4 +91,12 @@ export function intervalMandays(intervals, now = new Date()) {
     total += workingMandays(start, end ? new Date(end) : now)
   }
   return total
+}
+
+// Human label of the EFFECTIVE schedule (what the math actually uses —
+// invalid configured values fall back to the defaults, and so does this).
+export function workScheduleLabel() {
+  const days = parseWorkDays(CFG.workDays) ? String(CFG.workDays).trim() : DEFAULT_WORK_DAYS
+  const time = parseWorkTime(CFG.workTime) ? String(CFG.workTime).trim() : DEFAULT_WORK_TIME
+  return `${days} ${time}`
 }

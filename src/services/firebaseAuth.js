@@ -9,7 +9,7 @@ import {
   updatePassword,
 } from 'firebase/auth'
 import { auth } from './firebase.js'
-import { CFG, teamMembers } from '../config/appConfig.js'
+import { teamMembers } from '../config/appConfig.js'
 import { emailUsername } from '../utils/format.js'
 
 // The allowlist = your own email + TEAM_EMAILS from .env. Only these may sign in.

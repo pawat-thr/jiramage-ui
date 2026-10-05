@@ -38,6 +38,17 @@ describe('parseFieldRaw', () => {
   })
 })
 
+describe('WORK_TIME field', () => {
+  it('valid windows pass, malformed ones are rejected', () => {
+    const f = field('WORK_TIME')
+    expect(validateFieldRaw(f, '09:30-12:00,13:00-18:30')).toBeNull()
+    expect(validateFieldRaw(f, '09:00-17:00')).toBeNull()
+    expect(validateFieldRaw(f, 'nine to five')).toMatch(/HH:MM/)
+    expect(validateFieldRaw(f, '13:00-09:00')).toMatch(/HH:MM/)
+    expect(validateFieldRaw(f, '')).toBeNull() // empty = no override
+  })
+})
+
 describe('validateFieldRaw', () => {
   it('empty is always valid (= no override)', () => {
     for (const f of CONFIG_FIELDS) {

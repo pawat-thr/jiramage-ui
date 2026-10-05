@@ -24,21 +24,22 @@ v0.1.8 · by MpLab · MIT License · full versions display clean (`v0.1.8`); pre
 
 **QA Mode** (`/jiramage/qa`): the same app re-skinned blue ("QA-mage.") for the QA team (`QA_EMAILS`) — its own Dashboard, Team Task (QA burn statuses), and Capacity Planner. Entered via the **QA Mode** button in the top bar.
 
-Detail views have URLs too (`/delivery/DX-123[/DX-456]`, `/subtask-gen/DX-123`, `/integration/DX-123`, `/team-board/<id>`, `/pr-review/<id>`) — deep-linkable, browser back/forward works. Everywhere a subtask appears (task tables, planner, story details), clicking its name opens a **full detail overlay** (status, points, parent story, rich description, comments) with in-overlay navigation to the parent/siblings. Unknown URLs redirect home; `/login` bounces signed-in users to the dashboard.
+Detail views have URLs too (`/delivery/DX-123[/DX-456]`, `/subtask-gen/DX-123`, `/integration/DX-123`, `/team-board/<id>`, `/pr-review/<id>`) — deep-linkable, browser back/forward works. Everywhere a subtask appears (task tables, planner, story details), clicking its name opens a **full detail overlay** (status, points, parent story, rich description, comments) with in-overlay navigation to the parent/siblings — where you can also **comment on any card** (with @mentions that notify via Jira, and pasted/attached pictures) and **edit a subtask's points** (writes act as the API-token user). Unknown URLs redirect home; `/login` bounces signed-in users to the dashboard.
 
 ## Highlights
 
-- **Burn tracking**: computed from Jira changelogs as working-time intervals (status ping-pong safe) — Mon–Fri 9:30–12:00 + 13:00–18:30, 1 manday = 8 pt; live meter (blue → amber ≥75% → red over), frozen "used" stat on finished cards (subtasks only, capped + progressively rendered); burn statuses configurable per mode
-- **Team configuration in Firebase** (team mode): 13 `.env` fields (projects, burn statuses, QA emails, subtask prefixes, refresh interval, …) editable in Settings with per-field validation and **Firebase / .env source badges**. Precedence per field: Firebase > .env > default; missing required config shows a blocking error screen. Changes are **audit-logged** (append-only `settings/config/history`: who, when, old → new) and boot is instant via a localStorage cache — a "⚙ reload to apply" pill appears when a teammate changed something
+- **Burn tracking**: computed from Jira changelogs as working-time intervals (status ping-pong safe) — working schedule configurable via `WORK_TIME` + `WORK_DAYS` (default Mon–Fri 9:30–12:00 + 13:00–18:30; also drives planner day-off capacity), 1 manday = 8 pt; live meter (blue → amber ≥75% → red over), frozen "used" stat on finished cards (subtasks only, capped + progressively rendered); burn statuses configurable per mode
+- **Team configuration in Firebase** (team mode): 15 `.env` fields (projects, burn statuses, QA emails, subtask prefixes, refresh interval, work time/days, …) editable in Settings with per-field validation and **Firebase / .env source badges**. Precedence per field: Firebase > .env > default; missing required config shows a blocking error screen. Changes are **audit-logged** (append-only `settings/config/history`: who, when, old → new) and boot is instant via a localStorage cache — a "⚙ reload to apply" pill appears when a teammate changed something
 - **In-app notifications** (team mode): bell with live unread badge, Messenger-style ping (mutable in Settings), tab-title badge `(3) jiramage`, softer reminder every `REFRESH_INTERVAL`, 30-day retention sweep for read items
 - **Subtask → Confluence spec matching**: token-based (camelCase-aware) matching of subtask names against pages mentioned on the parent story; version-stamped localStorage cache
 - **Dev Prompt templates**: team-shared template with a required `{link}` param — one click turns any spec'd subtask into a ready-to-paste AI prompt
+- **Profile pictures**: upload in Settings → Profile (team mode: shared via Firestore, everyone sees it everywhere avatars appear; individual: this browser) — no photo = the classic initials-on-color avatar
 - **Long lists stay short**: issue tables render 50 rows per type group ("Show 50 more" / "Show all"), group headers fold on click — a 3,000-row view stays a one-screen page
 - Auto-refresh (default **5 min**), paginated fetch of **all** matching issues
 - Collapsible sidebar (icon rail / mobile drawer), fully responsive (tables scroll sideways on phones), 80% UI density (popups full-size)
 - Keyboard shortcuts `1–9` switch pages; `h` toggles active-only (suppressed while a popup is open)
 - Release/story-point custom fields auto-configured (overridable via env)
-- **180 unit tests** + a 16-check **headless-Chrome e2e smoke suite**
+- **200 unit tests** + a 16-check **headless-Chrome e2e smoke suite**
 
 ## Setup
 
@@ -73,6 +74,8 @@ JIRA_TEAM_FROM=2024-05-01
 #SUBTASK_PREFIX_FE=[FE]
 #SUBTASK_PREFIX_QA=[QA]
 #INTEGRATION_ROLES=BE,WEB,MOB
+#WORK_TIME=09:30-12:00,13:00-18:30
+#WORK_DAYS=Mon,Tue,Wed,Thu,Fri
 ```
 
 > Generate an API token at **id.atlassian.com → Security → API tokens**
@@ -83,7 +86,7 @@ Individual mode hides everything Firebase-backed (Team Board, PR Review, Inbox, 
 
 Add your Firebase web config (`VITE_FIREBASE_*` vars — see `.env.example`) and the app switches to team mode: email/password login restricted to the `TEAM_EMAILS` roster, first-login password setup with a live rule checklist (≥8 chars, 1 uppercase, 1 number, 1 special), change-password in Settings, and the Team Board / PR Review / Inbox pages backed by Firestore. Per-user preferences, the team-wide Dev Prompt template, the **Team configuration** overrides (+ audit log), and **Capacity Planner plans** sync via Firestore too.
 
-Firebase console setup: enable **Authentication → Email/Password**, create a **Firestore** database, and publish **`firestore.rules`** (the file in this repo is the source of truth — paste it in Build → Firestore → Rules whenever it changes). Collections used: `prs` (+comments), `tasks`, `labels`, `notifications`, `userPrefs`, `settings` (incl. `settings/config` + append-only `settings/config/history`), `integration`, `qaPlan`.
+Firebase console setup: enable **Authentication → Email/Password**, create a **Firestore** database, and publish **`firestore.rules`** (the file in this repo is the source of truth — paste it in Build → Firestore → Rules whenever it changes). Collections used: `prs` (+comments), `tasks`, `labels`, `notifications`, `userPrefs`, `settings` (incl. `settings/config` + append-only `settings/config/history`), `integration`, `qaPlan`, `profiles`.
 
 > The team allowlist is enforced client-side, which suits a trusted internal team; a `beforeCreate` blocking Cloud Function would make it airtight. Moving to a hosted deployment (server-side Jira token, login-user identity) is the 0.2.0 plan.
 
@@ -115,7 +118,7 @@ e2e/                # smoke.mjs — headless-Chrome UI automation (npm run test:
 ## Testing
 
 ```bash
-npm test            # 180 unit tests / 29 files (Vitest + React Testing Library), fully offline
+npm test            # 200 unit tests / 32 files (Vitest + React Testing Library), fully offline
 npm run test:watch  # watch mode
 npm run test:e2e    # 16-check UI smoke: boots a dev server (individual mode) + headless Chrome
 ```

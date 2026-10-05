@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import PrStatusBadge from './PrStatusBadge.jsx'
-import { PR_STATUSES, statusMeta, fmtTime, avatarColor, initials } from './prConstants.js'
+import { PR_STATUSES, statusMeta, fmtTime } from './prConstants.js'
 import { watchComments, addComment, setStatus } from '../../services/prApi.js'
 import { sendNotifications } from '../../services/notificationsApi.js'
 import { MentionTextarea, MentionText, extractMentionEmails } from './mentions.jsx'
 import { emailUsername } from '../../utils/format.js'
 import { cx, card } from '../../utils/ui.js'
+import Avatar from '../../components/common/Avatar.jsx'
 
 const linkRow = (label, url) =>
   url ? (
@@ -151,12 +152,7 @@ export default function PrDetail({ pr, user, onBack, onEdit, onDelete, onNotify 
                 key={email}
                 className="flex items-center gap-1.5 rounded-full border border-line bg-field py-1 pr-3 pl-1 text-[13px] text-ink-soft"
               >
-                <span
-                  className="grid size-5 place-items-center rounded-full text-[10px] font-bold text-bg"
-                  style={{ background: avatarColor(email) }}
-                >
-                  {initials(emailUsername(email))}
-                </span>
+                <Avatar id={email} name={emailUsername(email)} className="grid size-5 place-items-center rounded-full text-[10px] font-bold text-bg" />
                 {emailUsername(email)}
               </span>
             ))}
@@ -209,12 +205,7 @@ export default function PrDetail({ pr, user, onBack, onEdit, onDelete, onNotify 
             const who = emailUsername(c.authorEmail || c.authorName || '')
             return (
               <div key={c.id} className="flex gap-3">
-                <span
-                  className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-full text-xs font-bold text-bg"
-                  style={{ background: avatarColor(c.authorEmail || who) }}
-                >
-                  {initials(who)}
-                </span>
+                <Avatar id={c.authorEmail || who} name={who} className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-full text-xs font-bold text-bg" />
                 <div className="min-w-0 flex-1 rounded-2xl rounded-tl-sm border border-line bg-field px-4 py-2.5">
                   <div className="flex items-baseline justify-between gap-2">
                     <span className="text-[13px] font-semibold text-ink">{who}</span>
@@ -230,12 +221,7 @@ export default function PrDetail({ pr, user, onBack, onEdit, onDelete, onNotify 
         </div>
 
         <form onSubmit={postComment} className="mt-5 flex gap-3">
-          <span
-            className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-full text-xs font-bold text-bg"
-            style={{ background: avatarColor(user.email) }}
-          >
-            {initials(user.name)}
-          </span>
+          <Avatar id={user.email} name={user.name} className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-full text-xs font-bold text-bg" />
           <div className="min-w-0 flex-1">
             <MentionTextarea
               className="min-h-20 w-full resize-y rounded-2xl border border-line bg-field px-3.5 py-2.5 text-sm text-ink transition-colors placeholder:text-muted focus:border-accent"

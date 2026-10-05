@@ -5,6 +5,7 @@ import IssueDetailModal from './IssueDetailModal.jsx'
 import { browseUrl } from '../../services/jiraApi.js'
 import { watchPromptTemplate, DEFAULT_PROMPT_TEMPLATE } from '../../services/settingsApi.js'
 import { shortName, groupByType } from '../../utils/format.js'
+import { workScheduleLabel } from './burn.js'
 import { CFG } from '../../config/appConfig.js'
 import { typeColor } from '../../utils/typeColors.js'
 import { card, emptyState, miniBtn, th, td } from '../../utils/ui.js'
@@ -31,7 +32,7 @@ function SpecIcon() {
 // blue while on track, amber when ≥75% of the estimate, red when over.
 function BurnMeter({ mandays, points, finished = false }) {
   const burned = mandays * 8 // 1 manday = 8 points
-  const windows = 'Mon–Fri 9:30–12:00 & 13:00–18:30, 1d = 8pt'
+  const windows = `${workScheduleLabel()}, 1d = 8pt`
   if (!points)
     return (
       <div

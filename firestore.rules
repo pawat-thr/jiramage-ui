@@ -100,6 +100,13 @@ service cloud.firestore {
       allow create: if signedIn() && request.resource.data.by == email();
     }
 
+    // Profile pictures: one small doc per member (photo data-URL). Everyone
+    // reads; each member can only write/delete their OWN (doc id = email).
+    match /profiles/{member} {
+      allow read: if signedIn();
+      allow write: if signedIn() && member == email();
+    }
+
     // Integration Plan rows (per release+story): any member can read, sync
     // (create/delete during sync), and edit env/dates/remark.
     match /integration/{docId} {

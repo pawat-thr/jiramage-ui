@@ -1,8 +1,9 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, afterEach } from 'vitest'
+import { CFG } from '../config/appConfig.js'
 import {
   dateKey,
   monthKey,
-  isWeekend,
+  isDayOff,
   monthDays,
   capacityOf,
   plannedOn,
@@ -24,10 +25,10 @@ describe('date helpers', () => {
     expect(monthKey(d)).toBe('2026-09')
   })
 
-  it('isWeekend', () => {
-    expect(isWeekend('2026-09-05')).toBe(true) // Sat
-    expect(isWeekend('2026-09-06')).toBe(true) // Sun
-    expect(isWeekend('2026-09-07')).toBe(false) // Mon
+  it('isDayOff (default Mon–Fri work days)', () => {
+    expect(isDayOff('2026-09-05')).toBe(true) // Sat
+    expect(isDayOff('2026-09-06')).toBe(true) // Sun
+    expect(isDayOff('2026-09-07')).toBe(false) // Mon
   })
 
   it('monthDays covers the whole month', () => {
@@ -173,5 +174,28 @@ describe('reflowFrom', () => {
     let plan = autoPlace(EMPTY, 'A', 16, '2026-09-07').plan // Mon+Tue
     const { plan: next } = reflowFrom(plan, '2026-09-08')
     expect(next.days['2026-09-07']).toEqual([{ key: 'A', points: 8 }])
+  })
+})
+
+describe('configurable work days (WORK_DAYS)', () => {
+  const orig = CFG.workDays
+  afterEach(() => {
+    CFG.workDays = orig
+  })
+
+  it('Saturday becomes a working day when configured', () => {
+    CFG.workDays = 'Mon,Tue,Wed,Thu,Fri,Sat'
+    expect(isDayOff('2026-09-05')).toBe(false) // Sat now works
+    expect(isDayOff('2026-09-06')).toBe(true) // Sun still off
+    expect(capacityOf(EMPTY, '2026-09-05')).toBe(8)
+    // auto-place from Friday now flows into Saturday
+    const { placed } = autoPlace(EMPTY, 'DX-1', 16, '2026-09-04')
+    expect(placed.map((p) => p.day)).toEqual(['2026-09-04', '2026-09-05'])
+  })
+
+  it('invalid WORK_DAYS falls back to Mon–Fri', () => {
+    CFG.workDays = 'someday'
+    expect(isDayOff('2026-09-05')).toBe(true)
+    expect(isDayOff('2026-09-07')).toBe(false)
   })
 })
