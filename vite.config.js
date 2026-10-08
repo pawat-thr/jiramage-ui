@@ -4,6 +4,7 @@ import tailwindcss from '@tailwindcss/vite'
 import { execSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { parseInterval, list, DEFAULT_WORK_TIME, DEFAULT_WORK_DAYS } from './src/config/configFields.js'
+import ssoPlugin from './server/ssoPlugin.js'
 
 // Short git commit hash for the build code (Minecraft-snapshot style),
 // e.g. v0.1.7+a3f9c2d. Falls back to "dev" outside a git checkout.
@@ -26,11 +27,18 @@ export default defineConfig(({ mode }) => {
   // hash so testers can pin the exact build; FULL versions show clean (v0.1.7).
   const version = JSON.parse(readFileSync('./package.json', 'utf8')).version
   const appVersion = 'v' + version + (version.includes('-') ? '+' + gitHash() : '')
+  // Tokenless (SSO-only) mode: with no JIRA_TOKEN the legacy proxy sends no
+  // auth at all — signed-in traffic never reaches it (the SSO plugin proxies
+  // with the user's own Bearer token first).
+  // Basic auth is a PAIR — a token without its email is useless to Jira.
+  // SSO deployments set neither (tokenless; users act as themselves).
   const auth =
-    'Basic ' + Buffer.from(`${env.JIRA_EMAIL}:${env.JIRA_TOKEN}`).toString('base64')
+    env.JIRA_TOKEN && env.JIRA_EMAIL
+      ? 'Basic ' + Buffer.from(`${env.JIRA_EMAIL}:${env.JIRA_TOKEN}`).toString('base64')
+      : null
 
   return {
-    plugins: [react(), tailwindcss()],
+    plugins: [react(), tailwindcss(), ssoPlugin(env)],
     define: {
       __APP_VERSION__: JSON.stringify(appVersion),
       // Non-secret config only — the token stays inside the dev-server proxy.
@@ -38,8 +46,10 @@ export default defineConfig(({ mode }) => {
         jiraUrl: env.JIRA_URL || '',
         email: env.JIRA_EMAIL || '',
         teamEmails: list(env.TEAM_EMAILS),
-        // QA Mode sub-site: the QA team's emails (its dashboard data source).
-        qaEmails: list(env.QA_EMAILS),
+        // Teamage: parallel lists — TEAMS[i]'s lead is TEAM_LEADS[i].
+        // Members live in Firestore (teams/{slug}/members); empty TEAMS = off.
+        teams: list(env.TEAMS),
+        teamLeads: list(env.TEAM_LEADS).map((e) => e.toLowerCase()),
         projects: list(env.JIRA_PROJECT, true),
         teamFrom: (env.JIRA_TEAM_FROM || '2024-05-01').trim(),
         refreshMs: parseInterval(env.REFRESH_INTERVAL) ?? 5 * 60 * 1000,
@@ -60,14 +70,6 @@ export default defineConfig(({ mode }) => {
         burnFinishedStatuses: list(env.BURN_FINISHED_STATUSES).length
           ? list(env.BURN_FINISHED_STATUSES)
           : ['PR Review', 'Waiting for deployment', 'Done'],
-        // QA Mode burn: post-QA statuses where the stat shows frozen ("used").
-        qaBurnFinishedStatuses: list(env.QA_BURN_FINISHED_STATUSES).length
-          ? list(env.QA_BURN_FINISHED_STATUSES)
-          : ['Done'],
-        // QA Mode burn: the status QA subtasks work under.
-        qaBurnStatuses: list(env.QA_BURN_STATUSES).length
-          ? list(env.QA_BURN_STATUSES)
-          : ['In Progress'],
         // Team Task burn tracking: statuses that count as "in development".
         burnStatuses: list(env.BURN_STATUSES).length
           ? list(env.BURN_STATUSES)
@@ -102,7 +104,7 @@ export default defineConfig(({ mode }) => {
           target: env.JIRA_URL,
           changeOrigin: true,
           rewrite: (p) => p.replace(/^\/jira/, ''),
-          headers: { Authorization: auth },
+          headers: auth ? { Authorization: auth } : {},
           configure: (proxy) => {
             // Jira rejects cross-origin browser requests (XSRF) — drop the
             // browser-identifying headers so it sees a plain API call.

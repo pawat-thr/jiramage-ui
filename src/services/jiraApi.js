@@ -348,11 +348,3 @@ export function fetchUnassignedIssues() {
   return searchAll(jql, ['summary', 'status', 'priority', 'assignee', 'issuetype', 'parent', CFG.pointField])
 }
 
-// QA Mode: the QA team's issues (same shape as team issues, QA_EMAILS source).
-export function fetchQaIssues() {
-  if (!CFG.qaEmails.length) return Promise.resolve([])
-  const jql =
-    projectFilter() +
-    `assignee in (${quote(CFG.qaEmails)}) AND created >= "${CFG.teamFrom}" ORDER BY key DESC`
-  return searchAll(jql, ['summary', 'status', 'priority', 'assignee', 'issuetype', 'parent', CFG.pointField])
-}

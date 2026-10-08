@@ -1,6 +1,6 @@
 # jiramage-ui
 
-A web dashboard & team hub for Jira Cloud — the web rebuild of [jiramage](../jiramage), built with **React + Vite + Tailwind CSS**. Dark/light/system theming with a red accent, real URL routing, and two modes: **individual** (Jira only, zero setup beyond `.env`) and **team** (adds Firebase login + collaboration boards, notifications, shared settings, and planning tools). Plus **QA Mode** — a blue-accent sub-site of the same app for the QA team.
+A web dashboard & team hub for Jira Cloud — the web rebuild of [jiramage](../jiramage), built with **React + Vite + Tailwind CSS**. Dark/light/system theming with a red accent, real URL routing, and two modes: **individual** (Jira only, zero setup beyond `.env`) and **team** (adds Firebase login + collaboration boards, notifications, shared settings, and planning tools). Teams (incl. QA) are managed in-app via **Teamage**.
 
 v0.1.8 · by MpLab · MIT License · full versions display clean (`v0.1.8`); pre-releases append the git build hash (`v0.1.9-beta.1+<hash>`)
 
@@ -20,16 +20,15 @@ v0.1.8 · by MpLab · MIT License · full versions display clean (`v0.1.8`); pre
 | **Team Board** | `/team-board` | team | Label-grouped task board — link a ref story or internal work, assign users (scales to 20+), ENV, sprint start, target date (overdue in red); owner edits, anyone moves status |
 | **PR Review** | `/pr-review` | team | Post GitHub PRs, assign reviewers, **"Waiting for your review"** section on top, status changes, comments with **@mentions** — live via Firestore |
 | **Inbox** | `/inbox` | team | Notification history (review assignments, status changes on your PRs, comments, mentions) — All/Unread tabs, mark read, delete |
+| **Teamage** | `/teamage` | team | Team membership management — **leads only** (from `TEAM_LEADS`): add/remove members of your team, see who added whom. Members are what a signed-in user "belongs to"; someone in no team gets a "No team yet" landing page until a lead adds them |
 | **Settings** | `/settings` | both | Your settings (theme, notification sound, team-shared **Dev Prompt template**, account/password), **Team configuration** (see below), and the read-only "Fixed · .env" zone |
-
-**QA Mode** (`/jiramage/qa`): the same app re-skinned blue ("QA-mage.") for the QA team (`QA_EMAILS`) — its own Dashboard, Team Task (QA burn statuses), and Capacity Planner. Entered via the **QA Mode** button in the top bar.
 
 Detail views have URLs too (`/delivery/DX-123[/DX-456]`, `/subtask-gen/DX-123`, `/integration/DX-123`, `/team-board/<id>`, `/pr-review/<id>`) — deep-linkable, browser back/forward works. Everywhere a subtask appears (task tables, planner, story details), clicking its name opens a **full detail overlay** (status, points, parent story, rich description, comments) with in-overlay navigation to the parent/siblings — where you can also **comment on any card** (with @mentions that notify via Jira, and pasted/attached pictures) and **edit a subtask's points** (writes act as the API-token user). Unknown URLs redirect home; `/login` bounces signed-in users to the dashboard.
 
 ## Highlights
 
-- **Burn tracking**: computed from Jira changelogs as working-time intervals (status ping-pong safe) — working schedule configurable via `WORK_TIME` + `WORK_DAYS` (default Mon–Fri 9:30–12:00 + 13:00–18:30; also drives planner day-off capacity), 1 manday = 8 pt; live meter (blue → amber ≥75% → red over), frozen "used" stat on finished cards (subtasks only, capped + progressively rendered); burn statuses configurable per mode
-- **Team configuration in Firebase** (team mode): 15 `.env` fields (projects, burn statuses, QA emails, subtask prefixes, refresh interval, work time/days, …) editable in Settings with per-field validation and **Firebase / .env source badges**. Precedence per field: Firebase > .env > default; missing required config shows a blocking error screen. Changes are **audit-logged** (append-only `settings/config/history`: who, when, old → new) and boot is instant via a localStorage cache — a "⚙ reload to apply" pill appears when a teammate changed something
+- **Burn tracking**: computed from Jira changelogs as working-time intervals (status ping-pong safe) — working schedule configurable via `WORK_TIME` + `WORK_DAYS` (default Mon–Fri 9:30–12:00 + 13:00–18:30; also drives planner day-off capacity), 1 manday = 8 pt; live meter (blue → amber ≥75% → red over), frozen "used" stat on finished cards (subtasks only, capped + progressively rendered); burn statuses configurable via team config
+- **Team configuration in Firebase** (team mode): 12 `.env` fields (projects, burn statuses, subtask prefixes, refresh interval, work time/days, …) editable in Settings with per-field validation and **Firebase / .env source badges**. Precedence per field: Firebase > .env > default; missing required config shows a blocking error screen. Changes are **audit-logged** (append-only `settings/config/history`: who, when, old → new) and boot is instant via a localStorage cache — a "⚙ reload to apply" pill appears when a teammate changed something
 - **In-app notifications** (team mode): bell with live unread badge, Messenger-style ping (mutable in Settings), tab-title badge `(3) jiramage`, softer reminder every `REFRESH_INTERVAL`, 30-day retention sweep for read items
 - **Subtask → Confluence spec matching**: token-based (camelCase-aware) matching of subtask names against pages mentioned on the parent story; version-stamped localStorage cache
 - **Dev Prompt templates**: team-shared template with a required `{link}` param — one click turns any spec'd subtask into a ready-to-paste AI prompt
@@ -63,12 +62,9 @@ JIRA_TEAM_FROM=2024-05-01
 # optional — Jira custom field ids (defaults fit this org):
 #JIRA_RELEASE_FIELD=customfield_10127
 #JIRA_POINT_FIELD=customfield_10016
-# optional — QA Mode + burn + wizard tuning (all also editable via team config):
-#QA_EMAILS=qa1@company.com,qa2@company.com
+# optional — burn + wizard tuning (all also editable via team config):
 #BURN_STATUSES=In Dev,In Dev Testing
 #BURN_FINISHED_STATUSES=PR Review,Waiting for deployment,Done
-#QA_BURN_STATUSES=In Progress
-#QA_BURN_FINISHED_STATUSES=Done
 #CONFLUENCE_SPEC_SPACE=YourSpace
 #SUBTASK_PREFIX_BE=[BE]
 #SUBTASK_PREFIX_FE=[FE]
@@ -79,16 +75,29 @@ JIRA_TEAM_FROM=2024-05-01
 ```
 
 > Generate an API token at **id.atlassian.com → Security → API tokens**
+>
+> **Access matrix**: no Firebase → the `JIRA_EMAIL` + `JIRA_TOKEN` **pair**
+> required (Basic auth; minimum app). Firebase + Atlassian SSO → **neither** —
+> users sign in with Jira and act as themselves, and the login overwrites
+> `JIRA_EMAIL` so the deployed .env names no individual
+> (see `docs/PLAN-ORG-SSO.md`).
 
 Individual mode hides everything Firebase-backed (Team Board, PR Review, Inbox, login, notification sound) and stores preferences (default Release, Dev Prompt template) in the browser instead; the Capacity Planner works but doesn't persist plans.
 
 ## Team mode (Firebase, optional)
 
-Add your Firebase web config (`VITE_FIREBASE_*` vars — see `.env.example`) and the app switches to team mode: email/password login restricted to the `TEAM_EMAILS` roster, first-login password setup with a live rule checklist (≥8 chars, 1 uppercase, 1 number, 1 special), change-password in Settings, and the Team Board / PR Review / Inbox pages backed by Firestore. Per-user preferences, the team-wide Dev Prompt template, the **Team configuration** overrides (+ audit log), and **Capacity Planner plans** sync via Firestore too.
+Add your Firebase web config (`VITE_FIREBASE_*` vars — see `.env.example`) and the app switches to team mode, unlocking Team Board / PR Review / Inbox / Integration Plan / Teamage, synced preferences, the team-wide Dev Prompt template, **Team configuration** (+ audit log), **Capacity Planner persistence**, and **profile pictures**.
 
-Firebase console setup: enable **Authentication → Email/Password**, create a **Firestore** database, and publish **`firestore.rules`** (the file in this repo is the source of truth — paste it in Build → Firestore → Rules whenever it changes). Collections used: `prs` (+comments), `tasks`, `labels`, `notifications`, `userPrefs`, `settings` (incl. `settings/config` + append-only `settings/config/history`), `integration`, `qaPlan`, `profiles`.
+**Login — two options:**
 
-> The team allowlist is enforced client-side, which suits a trusted internal team; a `beforeCreate` blocking Cloud Function would make it airtight. Moving to a hosted deployment (server-side Jira token, login-user identity) is the 0.2.0 plan.
+- **Atlassian SSO (recommended)**: set `ATLASSIAN_CLIENT_ID/SECRET` + the Firebase service-account key (see `.env.example` + `docs/PLAN-ORG-SSO.md`). The login page becomes one "Continue with Atlassian" button — **no passwords anywhere**, every Jira write acts as the signed-in person, and `JIRA_EMAIL`/`JIRA_TOKEN` can be left empty. **The whitelist = Firebase Auth users**: add someone in Console → Authentication → Users (any throwaway password — it's never used) and they can sign in; delete them to revoke.
+- **Email/password (legacy)**: without SSO creds, the classic flow stays — login restricted to the `TEAM_EMAILS` roster, first-login password setup, change-password in Settings.
+
+**Teams (Teamage)**: define teams + leads in env (`TEAMS=mp,aoa` / `TEAM_LEADS=...`, parallel lists). Leads manage members on the Teamage page; a member's team decides whose data the whole app shows (the sidebar says "for team X"). Signed-in users in no team get a "No team yet" page until a lead adds them. Leave `TEAMS` empty to skip teams entirely (env roster for everyone). *Former `/jiramage/qa` users: QA Mode was retired in 0.1.9 — make QA a team instead.*
+
+Firebase console setup: enable **Authentication → Email/Password**, create a **Firestore** database, and publish **`firestore.rules`** (the file in this repo is the source of truth — paste it in Build → Firestore → Rules whenever it changes). Collections used: `prs` (+comments), `tasks`, `labels`, `notifications`, `userPrefs`, `settings` (incl. `settings/config` + append-only `settings/config/history`), `integration`, `qaPlan`, `profiles`, `teams` (members).
+
+> Client-side pieces of the allowlist/lead checks suit a trusted internal team; SSO already moved identity + whitelist server-side, and the hosted deployment (0.2.0, `docs/PLAN-ORG-SSO.md`) hardens the rest.
 
 ## Project structure
 
@@ -104,14 +113,14 @@ src/
 │   ├── delivery/   # deliveryUtils, ReleaseSummary, QASummary, exportXlsx (lazy SheetJS)
 │   ├── board/      # TaskForm, LabelForm, TaskDetail, boardConstants
 │   ├── pr/         # PrForm, PrDetail, mentions (@autocomplete), PrStatusBadge, prConstants
-│   └── inbox/      # notifText (shared notification row)
-├── qa/             # QA Mode: QaApp shell, QaCapacityPage (planner, shared by both modes), capacity.js (pure planning engine)
+│   ├── inbox/      # notifText (shared notification row)
+│   └── capacity/   # capacity.js — the pure planning engine (Capacity Planner)
 ├── pages/          # One component per page (see table above) + LoginPage, SubtaskGenPage, IntegrationPage
 ├── hooks/          # useJiraData, useAuth, usePrefs, useTheme, useToast, useKeyboardShortcuts
 ├── services/       # jiraApi (REST+JQL), firebase, firebaseAuth, configApi (team config + audit log), qaPlanApi, prApi, teamBoardApi, prefsApi, notificationsApi, settingsApi, integrationApi
 ├── utils/          # format, ui (Tailwind recipes), password, prefs, theme, typeColors, notifSound (Web Audio ping)
 ├── config/         # appConfig (injected config + teamMembers roster), configFields (shared field spec: vite + runtime)
-└── styles/         # global.css — Tailwind @theme tokens, light/dark (gradient), red/blue mode accents, zoom density
+└── styles/         # global.css — Tailwind @theme tokens, light/dark (gradient), zoom density
 e2e/                # smoke.mjs — headless-Chrome UI automation (npm run test:e2e)
 ```
 

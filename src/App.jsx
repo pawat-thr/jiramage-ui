@@ -17,8 +17,9 @@ const PrBoardPage = lazy(() => import('./pages/PrBoardPage.jsx'))
 const InboxPage = lazy(() => import('./pages/InboxPage.jsx'))
 const IntegrationPage = lazy(() => import('./pages/IntegrationPage.jsx'))
 const SubtaskGenPage = lazy(() => import('./pages/SubtaskGenPage.jsx'))
-const QaCapacityPage = lazy(() => import('./qa/QaCapacityPage.jsx'))
+const CapacityPage = lazy(() => import('./pages/CapacityPage.jsx'))
 const SettingsPage = lazy(() => import('./pages/SettingsPage.jsx'))
+const TeamagePage = lazy(() => import('./pages/TeamagePage.jsx'))
 import Spinner from './components/common/Spinner.jsx'
 import { useJiraData } from './hooks/useJiraData.js'
 import { useToast } from './hooks/useToast.js'
@@ -26,7 +27,6 @@ import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts.js'
 import { useAuth } from './hooks/useAuth.js'
 import { usePrefs } from './hooks/usePrefs.js'
 import { firebaseEnabled } from './services/firebase.js'
-import { fetchTeamIssues } from './services/jiraApi.js'
 import {
   loadTeamConfig,
   applyTeamConfig,
@@ -36,7 +36,8 @@ import {
   configDiffers,
 } from './services/configApi.js'
 import { CFG, teamMembers } from './config/appConfig.js'
-import QaApp, { QA_BASE } from './qa/QaApp.jsx'
+import { ssoStatus } from './services/ssoClient.js'
+import { teamsEnabled, resolveMembership, applyTeamRoster } from './services/teamsApi.js'
 
 // Main-mode Capacity Planner plans for the whole dev team roster.
 const TEAM_PLAN_EMAILS = teamMembers()
@@ -57,6 +58,7 @@ const NAV_ITEMS = [
         { id: 'inbox', label: 'Inbox', path: '/inbox' },
       ]
     : []),
+  ...(firebaseEnabled ? [{ id: 'teamage', label: 'Teamage', path: '/teamage' }] : []),
   { id: 'settings', label: 'Settings', path: '/settings' },
 ].map((t, i) => ({ ...t, key: String(i + 1) }))
 const NAV_KEYS = Object.fromEntries(NAV_ITEMS.map((t) => [t.key, t.id]))
@@ -87,6 +89,34 @@ export default function App() {
     return true
   })
   const [cfgStale, setCfgStale] = useState(false) // fresh doc differs from what booted
+  // Jira access matrix: no Firebase → JIRA_TOKEN required (minimum app);
+  // Firebase + SSO → tokenless (each user's own Jira permission). Neither
+  // token nor SSO → nothing can reach Jira: block with a clear screen.
+  const [jiraAccess, setJiraAccess] = useState(true)
+  // Teamage membership: with TEAMS configured, a signed-in user must belong
+  // to a team (lead via env, member via Firestore). Their team's member list
+  // then BECOMES the roster (CFG.teamEmails overlay) — every page shows that
+  // team's data. No team → landing page. Feature off → env roster as always.
+  const [membership, setMembership] = useState(() => (teamsEnabled() ? null : { off: true }))
+  useEffect(() => {
+    ssoStatus().then((st) => setJiraAccess(st.sso || st.jiraToken !== false))
+  }, [])
+  useEffect(() => {
+    if (!teamsEnabled() || !auth.user) return
+    let on = true
+    resolveMembership(auth.user.email)
+      .then((m) => {
+        if (!on) return
+        if (m) applyTeamRoster(m, auth.user.email)
+        setMembership(m || { none: true })
+      })
+      // a FAILED lookup is not "no team" — say what broke (usually: the
+      // teams/ rules block not published yet)
+      .catch((e) => on && setMembership({ none: true, error: e.message }))
+    return () => {
+      on = false
+    }
+  }, [auth.user])
   useEffect(() => {
     if (!firebaseEnabled || !auth.user) return
     let on = true
@@ -133,6 +163,56 @@ export default function App() {
   }
   if (atLogin) return <Navigate to="/" replace />
   if (!cfgReady) return <Spinner className="min-h-dvh" label="Loading team config…" />
+  if (teamsEnabled() && auth.user) {
+    if (membership === null) return <Spinner className="min-h-dvh" label="Loading your team…" />
+    if (membership.none)
+      return (
+        <div className="grid min-h-dvh place-items-center p-6">
+          <div className="max-w-md rounded-2xl border border-line bg-panel p-6 text-center shadow-lift">
+            <h1 className="text-lg font-semibold">No team yet</h1>
+            <p className="mt-2 text-sm text-ink-soft">
+              You're signed in as <strong>{auth.user.email}</strong>, but you're
+              not in any team.
+            </p>
+            {membership.error ? (
+              <p className="mt-3 rounded-xl border border-danger/40 bg-danger/10 px-3 py-2 text-[13px] text-danger">
+                Membership lookup FAILED (not a real "no team"): {String(membership.error)}.
+                Most likely the <code>teams/</code> block in firestore.rules isn't published yet.
+              </p>
+            ) : (
+              <p className="mt-3 text-[13px] text-muted">
+                Ask your team lead to add you on the <strong>Teamage</strong> page —
+                then reload and the team's workspace appears.
+              </p>
+            )}
+            {auth.logout && (
+              <button
+                className="mt-5 rounded-full border border-line bg-field px-5 py-2 text-sm text-ink-soft hover:border-line-strong hover:text-ink"
+                onClick={auth.logout}
+              >
+                Log out
+              </button>
+            )}
+          </div>
+        </div>
+      )
+  }
+  if (!jiraAccess)
+    return (
+      <div className="grid min-h-dvh place-items-center p-6">
+        <div className="max-w-md rounded-2xl border border-danger/40 bg-panel p-6 text-center shadow-lift">
+          <h1 className="text-lg font-semibold text-danger">No way to reach Jira</h1>
+          <p className="mt-2 text-sm text-ink-soft">
+            Neither a <code className="text-accent-bright">JIRA_TOKEN</code> nor Atlassian SSO is configured.
+          </p>
+          <p className="mt-3 text-[13px] text-muted">
+            Minimum app: set <code>JIRA_TOKEN</code> in <code>.env</code>. Team mode with SSO:
+            set <code>ATLASSIAN_CLIENT_ID/SECRET</code> + the Firebase service account
+            (see docs/PLAN-ORG-SSO.md) — then no token is needed.
+          </p>
+        </div>
+      </div>
+    )
   {
     // Rule 4: a required field with no value from Firebase OR .env blocks the
     // app — better an explicit screen than every Jira query silently empty.
@@ -155,11 +235,7 @@ export default function App() {
   }
   return (
     <>
-      {location.pathname.startsWith(QA_BASE) ? (
-        <QaApp user={auth.user} onLogout={auth.configured ? auth.logout : null} />
-      ) : (
-        <AppShell user={auth.user} onLogout={auth.configured ? auth.logout : null} />
-      )}
+      <AppShell user={auth.user} onLogout={auth.configured ? auth.logout : null} membership={membership} />
       {cfgStale && (
         <button
           className="zoom-normal fixed bottom-4 left-1/2 z-50 -translate-x-1/2 rounded-full border border-accent bg-accent-soft px-4 py-2 text-[13px] font-semibold text-accent-bright shadow-lift transition-colors hover:bg-accent hover:text-bg"
@@ -173,7 +249,7 @@ export default function App() {
   )
 }
 
-function AppShell({ user, onLogout }) {
+function AppShell({ user, onLogout, membership }) {
   // The URL is the source of truth for the active page.
   const location = useLocation()
   const navigate = useNavigate()
@@ -242,7 +318,8 @@ function AppShell({ user, onLogout }) {
   return (
     <div className="app-zoom flex min-h-dvh">
       <Sidebar
-        items={NAV_ITEMS}
+        items={NAV_ITEMS.filter((t) => t.id !== 'teamage' || membership?.role === 'lead')}
+        teamName={membership?.team || null}
         active={tab}
         onSelect={setTab}
         collapsed={collapsed}
@@ -258,8 +335,6 @@ function AppShell({ user, onLogout }) {
           onLogout={onLogout}
           onToggleCollapse={() => setCollapsed((v) => !v)}
           onToggleMobile={() => setMobileOpen(true)}
-          mode="main"
-          onSwitchMode={() => navigate(QA_BASE)}
         />
 
         <main className="flex-1 p-4 md:p-6">
@@ -312,21 +387,14 @@ function AppShell({ user, onLogout }) {
             />
           )}
           {tab === 'gen' && <SubtaskGenPage onNotify={showToast} />}
-          {tab === 'capacity' && (
-            <QaCapacityPage
-              onNotify={showToast}
-              emails={TEAM_PLAN_EMAILS}
-              fetchIssues={fetchTeamIssues}
-              teamLabel="member"
-              envVar="TEAM_EMAILS"
-            />
-          )}
+          {tab === 'capacity' && <CapacityPage onNotify={showToast} emails={TEAM_PLAN_EMAILS} />}
           {tab === 'board' && <TeamBoardPage user={user} onNotify={showToast} />}
           {tab === 'pr' && <PrBoardPage user={user} onNotify={showToast} />}
           {tab === 'integration' && (
             <IntegrationPage defaultRelease={defaultRelease} onNotify={showToast} />
           )}
           {tab === 'inbox' && <InboxPage user={user} onNotify={showToast} />}
+          {tab === 'teamage' && <TeamagePage user={user} onNotify={showToast} />}
           {tab === 'settings' && <SettingsPage onNotify={showToast} user={user} />}
           </Suspense>
           </div>

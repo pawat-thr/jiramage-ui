@@ -59,7 +59,7 @@ describe('validateFieldRaw', () => {
 
   it('rejects double quotes everywhere (JQL safety)', () => {
     expect(validateFieldRaw(field('JIRA_TEAM_FROM'), '2026-01-01"')).toMatch(/quotes/)
-    expect(validateFieldRaw(field('QA_EMAILS'), 'a"@x.com')).toMatch(/quotes/)
+    expect(validateFieldRaw(field('BURN_STATUSES'), 'In "Dev"')).toMatch(/quotes/)
   })
 
   it('rejects unparsable intervals', () => {
@@ -74,7 +74,7 @@ describe('validateFieldRaw', () => {
   })
 
   it('rejects a list that parses to nothing', () => {
-    expect(validateFieldRaw(field('QA_EMAILS'), ',,,')).toMatch(/comma-separated/)
-    expect(validateFieldRaw(field('QA_EMAILS'), 'a@x.com')).toBeNull()
+    expect(validateFieldRaw(field('BURN_STATUSES'), ',,,')).toMatch(/comma-separated/)
+    expect(validateFieldRaw(field('BURN_STATUSES'), 'In Dev')).toBeNull()
   })
 })

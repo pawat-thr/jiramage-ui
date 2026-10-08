@@ -1,7 +1,7 @@
 # Known issues — to fix in a version before 0.2.0
 
-> Accepted for local team use in 0.1.7. Must be resolved (or consciously re-accepted)
-> before the 0.2.0 deployment release.
+> Accepted for local team use (0.1.7 → 0.1.9). Must be resolved (or consciously
+> re-accepted) before the 0.2.0 deployment release.
 
 ## 1. Integration Plan: last-write-wins on concurrent saves
 
@@ -30,3 +30,33 @@ write the whole document.
 
 *Fix ideas:* `updatedAt` optimistic-concurrency check on submit ("this task was
 changed while you edited — reload?"); or switch edit-forms to field-diff updates.
+
+## 3. SSO sessions are in-memory (0.1.9, by design for the dev phase)
+
+Atlassian SSO sessions live in the dev server's memory. Restarting
+`npm run dev` logs everyone out — the app fails SAFELY (401 + re-login
+prompt; your writes can never silently fall back to the shared token), but
+expect a one-click re-login after every server restart. Also: the Capacity
+Planner's auto-refresh or a long-idle tab may hit the same 401 — reload to
+sign in again.
+
+*Fix (0.2.0):* sessions move to Firestore when the standalone server lands.
+
+## 4. Teamage lead checks are client-side (0.1.9 draft)
+
+Leads come from env (`TEAM_LEADS`), which Firestore rules can't read — so
+"only leads edit members" is enforced in the UI, while the rules allow any
+signed-in member to write `teams/*/members`. Fine for a trusted team; a
+malicious member could add/remove members via the API.
+
+*Fix:* Phase C of docs/PLAN-ORG-SSO.md moves teams/leads into Firestore and
+locks member writes to the team's lead in rules.
+
+## 5. Team config propagates on reload, not live
+
+Changing Settings → Team configuration reloads YOUR app; teammates get a
+"⚙ Team config updated — reload to apply" pill on their next load (the
+boot-time cache applies instantly, the fresh doc is compared in the
+background). Nobody's running session hot-swaps config — by design, to avoid
+torn state. If someone says "the config change didn't work", the answer is:
+click the pill / reload.

@@ -2,9 +2,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { CFG } from '../config/appConfig.js'
+// Pin the spec space so this suite does NOT depend on the developer's real
+// .env (the space filter is the behavior under test).
+vi.mock('../config/appConfig.js', async (importOriginal) => {
+  const actual = await importOriginal()
+  return { ...actual, CFG: { ...actual.CFG, specSpace: 'Merchant' } }
+})
 
-const SPACE = CFG.specSpace || 'Merchant'
+const { CFG } = await import('../config/appConfig.js')
+
+const SPACE = 'Merchant'
 const api = {
   createSubtasks: vi.fn(),
 }

@@ -86,7 +86,11 @@ try {
       { timeout: 30000 },
     ).catch(() => {})
     hasSpec = await page.evaluate(() => [...document.querySelectorAll('a')].some((a) => a.textContent.includes('Spec')))
-    ok('spec chips resolve', hasSpec)
+    // data-dependent: the active subtasks may legitimately have no matching
+    // Confluence spec — only a chip APPEARING proves the pipeline; absence
+    // proves nothing, so it skips instead of failing.
+    if (hasSpec) ok('spec chips resolve', true)
+    else console.log('  [skip] spec chips — no spec-linked subtasks right now')
   }
   if (hasSpec) {
     await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.textContent.includes('Prompt'))?.click())
@@ -156,7 +160,7 @@ try {
   const s = await page.evaluate(() => document.body.textContent)
   ok('settings zones render', s.includes('Fixed configuration') && s.includes('Dev Prompt'))
   ok('settings team config lists the movable fields',
-    ['REFRESH_INTERVAL', 'JIRA_PROJECT', 'QA_EMAILS', 'BURN_STATUSES'].every((k) => s.includes(k)))
+    ['REFRESH_INTERVAL', 'JIRA_PROJECT', 'WORK_TIME', 'BURN_STATUSES'].every((k) => s.includes(k)))
 
   // ---- routing guards ----
   await page.goto(BASE + '/inbox', { waitUntil: 'networkidle0' })

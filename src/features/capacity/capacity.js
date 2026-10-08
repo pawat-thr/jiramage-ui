@@ -2,7 +2,7 @@
 // 1 point = 1 hour. Default capacity: 8 points per working day (WORK_DAYS).
 // A user-month plan: { capacity: { 'YYYY-MM-DD': n }, days: { 'YYYY-MM-DD': [ {key, points, delayed?} ] } }
 
-import { workDaySet } from '../utils/workDays.js'
+import { workDaySet } from '../../utils/workDays.js'
 
 const DEFAULT_CAPACITY = 8
 

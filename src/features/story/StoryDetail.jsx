@@ -5,6 +5,7 @@ import AdfContent from './AdfContent.jsx'
 import { releaseNames } from './releaseNames.js'
 import { fetchIssueDetail, fetchSubtasks, addComment, setPoints, uploadAttachments, resolveAccountIds, browseUrl, MENTION_RE } from '../../services/jiraApi.js'
 import { MentionTextarea } from '../pr/mentions.jsx'
+import { ssoFlags } from '../../services/ssoClient.js'
 import { shortName, emailUsername } from '../../utils/format.js'
 import { CFG, teamMembers } from '../../config/appConfig.js'
 import { card, emptyState } from '../../utils/ui.js'
@@ -336,10 +337,11 @@ function PointsEditor({ issueKey, value, onSaved }) {
   )
 }
 
-// Everyone @mentionable in a Jira comment: dev roster + the QA team.
+// Everyone @mentionable in a Jira comment: the team roster (with Teamage
+// active this is the signed-in user's whole team, QA folks included).
 const mentionCandidates = () => {
   const seen = new Set()
-  return [...teamMembers(), ...CFG.qaEmails]
+  return [...teamMembers()]
     .filter((e) => !seen.has(e.toLowerCase()) && seen.add(e.toLowerCase()))
     .map((email) => ({ email, name: emailUsername(email) }))
 }
@@ -431,7 +433,7 @@ function CommentBox({ issueKey, onPosted }) {
             🖼 Add picture
           </button>
           <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => { addFiles(e.target.files); e.target.value = '' }} />
-          {err ? <span className="text-danger">{err}</span> : <>Posts to Jira as <strong>{CFG.email}</strong> (the API-token user).</>}
+          {err ? <span className="text-danger">{err}</span> : <>Posts to Jira as <strong>{CFG.email}</strong>{ssoFlags.sso ? ' (your Atlassian login).' : ' (the API-token user).'}</>}
         </span>
         <button
           disabled={(!text.trim() && !files.length) || busy}

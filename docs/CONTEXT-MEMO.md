@@ -15,9 +15,9 @@
     missing/REPLACE → firebase pages hidden, everything else works)
   - **team mode**: + Firebase (auth, Firestore: team board, PR review, inbox,
     integration plan, settings, qaPlan)
-- **QA Mode sub-site**: `/jiramage/qa` (+ `/team-task`, `/capacity`), same
-  codebase, blue accent (`data-mode="qa"`), brand "QA-mage.", team from
-  `QA_EMAILS`. Entered via "QA Mode" button in the main TopBar.
+- **QA Mode: RETIRED in v0.1.9** (was `/jiramage/qa`) — superseded by
+  Teamage teams; a QA team is just a team now. Planner lives at
+  src/pages/CapacityPage.jsx + src/features/capacity/capacity.js.
 
 ## Hard rules (user-set — do not violate)
 
@@ -139,6 +139,16 @@
 `INTEGRATION_ROLES=BE,WEB,MOB`, `REFRESH_INTERVAL`, Firebase keys,
 `POINT_FIELD`/`RELEASE_FIELD` custom field ids. All parsed in vite.config.js
 into `CFG` (src/config/appConfig.js re-exports).
+
+## THE v0.1.9 KEY FEATURE — docs/PLAN-ORG-SSO.md (read before working on it)
+
+Phases: 0) server + Atlassian SSO (OAuth 3LO, Firebase custom tokens, kills
+the env Jira token) → A) Firestore tree under teams/{slug} + membership
+rules + MP migration → B) members collection replaces TEAM_EMAILS/QA_EMAILS
++ invites → C) admin create-team, subdomain tenancy (mp.{host}, aoa.{host}).
+ALL FOUR PHASES ship in v0.1.9, demoed locally (vite-middleware SSO,
+*.localhost subdomains); 0.2.0 = real hosting only. Read that file first;
+it has the decisions and open questions.
 
 ## Added between beta.2 and the 0.1.8 final (all in docs/v0.1.8.md)
 

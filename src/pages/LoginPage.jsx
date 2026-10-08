@@ -53,6 +53,34 @@ function RuleChecklist({ password, confirm, showMatch }) {
   )
 }
 
+// Atlassian SSO button — when the server has SSO configured, this is the
+// ONLY way in (no passwords). ?sso_error= from the callback shows inline.
+function SsoLogin({ authError }) {
+  const err = new URLSearchParams(window.location.search).get('sso_error') || authError
+  return (
+    <div className="grid gap-4">
+      {err && (
+        <p className="rounded-xl border border-danger/40 bg-danger/10 px-3.5 py-2.5 text-[13px] text-danger">
+          {err}
+        </p>
+      )}
+      <a
+        href="/auth/login"
+        className="flex items-center justify-center gap-2.5 rounded-xl border border-accent bg-accent-soft px-5 py-3 text-sm font-semibold text-accent-bright transition-colors hover:bg-accent hover:text-bg"
+      >
+        <svg viewBox="0 0 24 24" className="size-5" fill="currentColor" aria-hidden>
+          <path d="M7.1 11.2c-.3-.4-.9-.4-1.1.1L1.6 20c-.2.5.1 1 .6 1h6.1c.2 0 .4-.1.5-.3 1.3-2.7.5-6.8-1.7-9.5zM11.5 3.3c-2.3 3.6-2.1 7.6-.6 10.6l2.9 5.8c.1.2.3.3.5.3h6.1c.5 0 .9-.5.6-1L12.6 3.3c-.2-.5-.9-.5-1.1 0z" />
+        </svg>
+        Continue with Atlassian
+      </a>
+      <p className="text-center text-xs text-muted">
+        Sign in with your Jira account. Access is limited to invited members —
+        ask the team head if you get "not invited".
+      </p>
+    </div>
+  )
+}
+
 export default function LoginPage({ auth }) {
   const [mode, setMode] = useState('signin') // 'signin' | 'activate'
   const [email, setEmail] = useState('')
@@ -136,6 +164,10 @@ export default function LoginPage({ auth }) {
         </div>
 
         <div className="rounded-[18px] border border-line bg-panel p-6 shadow-lift sm:p-7">
+          {auth.sso ? (
+            <SsoLogin authError={auth.error} />
+          ) : (
+            <>
           <div className="mb-2 flex gap-1 rounded-xl border border-line bg-field p-1">
             {tab('signin', 'Sign in')}
             {tab('activate', 'First time here')}
@@ -238,6 +270,8 @@ export default function LoginPage({ auth }) {
               </>
             )}
           </p>
+            </>
+          )}
         </div>
 
         <p className="mt-4 text-center text-[11px] text-muted">

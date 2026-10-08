@@ -7,6 +7,7 @@ import { firebaseEnabled } from '../services/firebase.js'
 import { changePassword } from '../services/firebaseAuth.js'
 import { validatePassword, PASSWORD_RULES } from '../utils/password.js'
 import { getNotifSound, setNotifSound } from '../utils/prefs.js'
+import { ssoStatus } from '../services/ssoClient.js'
 import { playPing } from '../utils/notifSound.js'
 import {
   watchPromptTemplate,
@@ -471,6 +472,10 @@ function ZoneHeader({ title, hint }) {
 export default function SettingsPage({ onNotify, user }) {
   const [theme, setTheme] = useTheme()
   const [soundOn, setSoundOn] = useState(getNotifSound())
+  const [ssoOn, setSsoOn] = useState(false)
+  useEffect(() => {
+    ssoStatus().then((st) => setSsoOn(st.sso))
+  }, [])
 
   return (
     <div className="mx-auto grid w-full max-w-3xl gap-4">
@@ -554,13 +559,20 @@ export default function SettingsPage({ onNotify, user }) {
       {firebaseEnabled && user && (
         <Section title="Account">
           <Row name="Signed in as">{user.email}</Row>
-          <div className="mt-1 border-t border-line pt-5">
-            <h3 className="text-sm font-semibold text-ink">Change password</h3>
-            <p className="mt-0.5 mb-4 text-xs text-muted">
-              Confirm your current password, then set a new one.
+          {ssoOn ? (
+            <p className="text-xs text-muted">
+              Signed in with Atlassian (SSO) — no app password exists; manage
+              your credentials at id.atlassian.com.
             </p>
-            <ChangePassword onNotify={onNotify} />
-          </div>
+          ) : (
+            <div className="mt-1 border-t border-line pt-5">
+              <h3 className="text-sm font-semibold text-ink">Change password</h3>
+              <p className="mt-0.5 mb-4 text-xs text-muted">
+                Confirm your current password, then set a new one.
+              </p>
+              <ChangePassword onNotify={onNotify} />
+            </div>
+          )}
         </Section>
       )}
 

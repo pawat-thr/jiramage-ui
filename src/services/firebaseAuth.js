@@ -1,4 +1,4 @@
-import {
+import { signInWithCustomToken,
   onAuthStateChanged,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -77,4 +77,10 @@ export async function changePassword(currentPassword, newPassword) {
   } catch (e) {
     throw new Error(friendly(e))
   }
+}
+
+// Atlassian SSO: the server verified identity + whitelist and minted this
+// custom token — exchanging it signs into Firebase without any password.
+export function signInWithSsoToken(token) {
+  return signInWithCustomToken(auth, token)
 }

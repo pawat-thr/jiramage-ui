@@ -3,7 +3,7 @@ import ModalShell from '../components/common/ModalShell.jsx'
 import IssueDetailModal from '../features/issues/IssueDetailModal.jsx'
 import Spinner from '../components/common/Spinner.jsx'
 import FilterMenu from '../components/common/FilterMenu.jsx'
-import { fetchQaIssues, fetchUnassignedIssues, fetchStories, assignIssue, browseUrl, resolveAccountIds } from '../services/jiraApi.js'
+import { fetchTeamIssues, fetchUnassignedIssues, fetchStories, assignIssue, browseUrl, resolveAccountIds } from '../services/jiraApi.js'
 import { loadPlans, savePlan } from '../services/qaPlanApi.js'
 import { firebaseEnabled } from '../services/firebase.js'
 import {
@@ -19,7 +19,7 @@ import {
   setChunkPoints,
   setCapacity,
   reflowFrom,
-} from './capacity.js'
+} from '../features/capacity/capacity.js'
 import { CFG } from '../config/appConfig.js'
 import { emailUsername, uniqueSorted } from '../utils/format.js'
 import { releaseNames } from '../features/story/releaseNames.js'
@@ -54,15 +54,14 @@ function Avatar({ email, size = 'size-6', text = 'text-[10px]' }) {
   )
 }
 
-// Used by both modes: QA Mode with the defaults, main mode with the dev team
-// (emails + fetchIssues + labels passed in). Plans live in the same `qaPlan`
-// collection either way — docs are keyed per email, so the modes can't collide.
-export default function QaCapacityPage({
+// The Capacity Planner (QA Mode retired — a QA team is just a team now).
+// Props keep it team-agnostic: pass any roster + fetcher.
+export default function CapacityPage({
   onNotify,
-  emails = CFG.qaEmails,
-  fetchIssues = fetchQaIssues,
-  teamLabel = 'QA',
-  envVar = 'QA_EMAILS',
+  emails,
+  fetchIssues = fetchTeamIssues,
+  teamLabel = 'member',
+  envVar = 'TEAM_EMAILS',
 }) {
   const today = dateKey(new Date())
   const [mKey, setMKey] = useState(monthKey(new Date()))

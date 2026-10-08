@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest'
-import { CFG } from '../config/appConfig.js'
+import { CFG } from '../../config/appConfig.js'
 import {
   dateKey,
   monthKey,

@@ -71,9 +71,6 @@ export const CONFIG_FIELDS = [
   { env: 'INTEGRATION_ROLES', key: 'integrationRoles', kind: 'list', hint: 'Integration Plan target-date columns (e.g. BE, WEB, MOB)' },
   { env: 'BURN_STATUSES', key: 'burnStatuses', kind: 'list', hint: 'statuses that count as "in development" for burn' },
   { env: 'BURN_FINISHED_STATUSES', key: 'burnFinishedStatuses', kind: 'list', hint: 'post-dev statuses where burn shows frozen ("used")' },
-  { env: 'QA_EMAILS', key: 'qaEmails', kind: 'list', hint: 'QA Mode team emails, comma-separated' },
-  { env: 'QA_BURN_STATUSES', key: 'qaBurnStatuses', kind: 'list', hint: 'QA Mode: statuses QA subtasks burn under' },
-  { env: 'QA_BURN_FINISHED_STATUSES', key: 'qaBurnFinishedStatuses', kind: 'list', hint: 'QA Mode: post-QA statuses ("used" stat)' },
   { env: 'WORK_TIME', key: 'workTime', kind: 'worktime', hint: 'burn working windows on work days (e.g. 09:30-12:00,13:00-18:30)' },
   { env: 'WORK_DAYS', key: 'workDays', kind: 'workdays', hint: 'working days for burn + capacity (e.g. Mon,Tue,Wed,Thu,Fri)' },
 ]

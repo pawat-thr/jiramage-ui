@@ -61,6 +61,14 @@ const ICONS = {
       <path d="M3.5 10h17M8 3v4M16 3v4M7.5 14h3M13.5 14h3M7.5 17.5h3" />
     </>
   ),
+  teamage: (
+    <>
+      {/* membership badge (distinct from the Team Task people icon) */}
+      <rect x="4" y="3.5" width="16" height="17" rx="2" />
+      <circle cx="12" cy="9.5" r="2.4" />
+      <path d="M7.5 16.8c.8-1.8 2.5-2.8 4.5-2.8s3.7 1 4.5 2.8" />
+    </>
+  ),
   settings: (
     <>
       <circle cx="12" cy="12" r="3" />
@@ -85,7 +93,7 @@ function NavIcon({ name }) {
   )
 }
 
-export default function Sidebar({ items, active, onSelect, collapsed, mobileOpen, onCloseMobile, brand = APP_NAME }) {
+export default function Sidebar({ items, active, onSelect, collapsed, mobileOpen, onCloseMobile, brand = APP_NAME, teamName = null }) {
   return (
     <>
       {/* mobile backdrop */}
@@ -106,9 +114,16 @@ export default function Sidebar({ items, active, onSelect, collapsed, mobileOpen
       >
         <div className={cx('flex h-[68px] items-center gap-2.5 border-b border-line', collapsed ? 'md:justify-center md:px-0 px-5' : 'px-5')}>
           <img src="/logo.png" alt="jiramage logo" className="size-8 shrink-0 rounded-lg object-contain" />
-          <span className={cx('text-xl font-bold tracking-tight', collapsed && 'md:hidden')}>
-            {brand}
-            <span className="text-accent">.</span>
+          <span className={cx('min-w-0', collapsed && 'md:hidden')}>
+            <span className="block text-xl leading-tight font-bold tracking-tight">
+              {brand}
+              <span className="text-accent">.</span>
+            </span>
+            {teamName && (
+              <span className="block truncate text-[11px] leading-tight font-medium text-muted">
+                for team <span className="text-accent-bright uppercase">{teamName}</span>
+              </span>
+            )}
           </span>
         </div>
 

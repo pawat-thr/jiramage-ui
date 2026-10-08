@@ -24,9 +24,6 @@ const resetCfg = () => {
     integrationRoles: ['BE', 'WEB', 'MOB'],
     burnStatuses: ['In Dev', 'In Dev Testing'],
     burnFinishedStatuses: ['Done'],
-    qaEmails: ['q1@x.com'],
-    qaBurnStatuses: ['In Progress'],
-    qaBurnFinishedStatuses: ['Done'],
   })
 }
 beforeEach(resetCfg)
@@ -41,9 +38,9 @@ describe('applyTeamConfig — the 4 precedence rules', () => {
   })
 
   it('rule 3: empty/blank Firebase values leave the .env value standing', () => {
-    applyTeamConfig({ BURN_STATUSES: '   ', QA_EMAILS: '' })
+    applyTeamConfig({ BURN_STATUSES: '   ', INTEGRATION_ROLES: '' })
     expect(CFG.burnStatuses).toEqual(['In Dev', 'In Dev Testing'])
-    expect(CFG.qaEmails).toEqual(['q1@x.com'])
+    expect(CFG.integrationRoles).toEqual(['BE', 'WEB', 'MOB'])
   })
 
   it('invalid values are skipped, not applied', () => {
@@ -84,8 +81,8 @@ describe('envRawOf — the pre-overlay baseline', () => {
 
 describe('configDiffers', () => {
   it('field-wise trimmed comparison', () => {
-    expect(configDiffers({ QA_EMAILS: 'a@x.com' }, { QA_EMAILS: ' a@x.com ' })).toBe(false)
-    expect(configDiffers({ QA_EMAILS: 'a@x.com' }, { QA_EMAILS: 'b@x.com' })).toBe(true)
+    expect(configDiffers({ BURN_STATUSES: 'a' }, { BURN_STATUSES: ' a ' })).toBe(false)
+    expect(configDiffers({ BURN_STATUSES: 'a' }, { BURN_STATUSES: 'b' })).toBe(true)
     expect(configDiffers({}, {})).toBe(false)
     expect(configDiffers({ BURN_STATUSES: 'X' }, {})).toBe(true)
     expect(configDiffers({ UNRELATED: 'x' }, {})).toBe(false) // unknown keys ignored
