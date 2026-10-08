@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import Avatar from '../components/common/Avatar.jsx'
 import ConfirmDialog from '../components/common/ConfirmDialog.jsx'
-import { leadTeamOf, leadsOf, watchMembers, addMember, removeMember } from '../services/teamsApi.js'
+import { leadTeamOf, leadsOf, watchMembers, addMember, removeMember, teamOf, allTakenEmails, unassignedOf } from '../services/teamsApi.js'
+import { fetchAuthUsers } from '../services/ssoClient.js'
 import { emailUsername } from '../utils/format.js'
+import Spinner from '../components/common/Spinner.jsx'
 import { card } from '../utils/ui.js'
 
 const inputCls =
@@ -18,11 +20,26 @@ export default function TeamagePage({ user, onNotify }) {
   const [email, setEmail] = useState('')
   const [busy, setBusy] = useState(false)
   const [confirm, setConfirm] = useState(null) // email pending removal
+  const [unassigned, setUnassigned] = useState(undefined) // undefined = loading, null = unavailable, [] = loaded
 
   useEffect(() => {
     if (!team) return
     return watchMembers(team, setMembers, (e) => onNotify(e.message, true))
   }, [team])
+
+  // "People without a team": whitelist (Firebase Auth users via the server)
+  // minus everyone already in some team. Needs an SSO session — without it
+  // the section simply hides. Recomputes when this team's members change.
+  useEffect(() => {
+    if (!team) return
+    let on = true
+    Promise.all([fetchAuthUsers(), allTakenEmails()])
+      .then(([all, taken]) => on && setUnassigned(all ? unassignedOf(all, taken) : null))
+      .catch(() => on && setUnassigned(null))
+    return () => {
+      on = false
+    }
+  }, [team, members?.length])
 
   if (!team)
     return (
@@ -34,6 +51,11 @@ export default function TeamagePage({ user, onNotify }) {
       </div>
     )
 
+  // Single paint: wait for BOTH the member list and the no-team list, so the
+  // page never "finishes" and then pops more content in.
+  if (members === null || unassigned === undefined)
+    return <Spinner label={`Loading team ${team.toUpperCase()}…`} />
+
   const leads = leadsOf(team)
   const add = async (e) => {
     e.preventDefault()
@@ -43,6 +65,12 @@ export default function TeamagePage({ user, onNotify }) {
     if (members?.some((m) => m.email === addr)) return onNotify(`${addr} is already a member`, true)
     setBusy(true)
     try {
+      // ONE TEAM PER PERSON: block adding someone who's in any other team
+      const existing = await teamOf(addr)
+      if (existing && existing.team !== team) {
+        onNotify(`${emailUsername(addr)} is already ${existing.role === 'lead' ? 'the LEAD of' : 'a member of'} team ${existing.team.toUpperCase()} — one team per person`, true)
+        return
+      }
       await addMember(team, addr, user.email)
       setEmail('')
       onNotify(`✓ ${emailUsername(addr)} added to ${team.toUpperCase()} — they'll see the team on their next reload`)
@@ -100,8 +128,52 @@ export default function TeamagePage({ user, onNotify }) {
             sure the person exists there too.
           </p>
 
+          <div>
+            {unassigned === null ? (
+              <p className="text-xs text-muted">
+                People-without-a-team list unavailable — it needs Atlassian SSO
+                configured (the server reads the whitelist). You can still add
+                by email above.
+              </p>
+            ) : (
+              <>
+              <span className="mb-1.5 block text-xs font-medium text-muted">
+                People without a team ({unassigned.length}) — click to add
+              </span>
+              {unassigned.length === 0 ? (
+                <p className="text-[13px] text-muted">Everyone on the whitelist has a team. ✓</p>
+              ) : (
+                <div className="flex flex-wrap gap-1.5">
+                  {unassigned.map((e) => (
+                    <button
+                      key={e}
+                      disabled={busy}
+                      className="flex items-center gap-1.5 rounded-full border border-dashed border-line bg-field py-1 pr-3 pl-1 text-[13px] text-ink-soft transition-colors hover:border-accent hover:text-accent-bright disabled:opacity-50"
+                      title={`Add ${e} to ${team.toUpperCase()}`}
+                      onClick={async () => {
+                        setBusy(true)
+                        try {
+                          await addMember(team, e, user.email)
+                          onNotify(`✓ ${emailUsername(e)} added to ${team.toUpperCase()}`)
+                        } catch (err) {
+                          onNotify(err.message, true)
+                        } finally {
+                          setBusy(false)
+                        }
+                      }}
+                    >
+                      <Avatar id={e} name={emailUsername(e)} className="grid size-5 place-items-center rounded-full text-[10px] font-bold text-bg" />
+                      {emailUsername(e)}
+                      <span className="text-muted">+</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              </>
+            )}
+          </div>
+
           <div className="grid gap-2">
-            {members === null && <p className="text-[13px] text-muted">Loading members…</p>}
             {members?.length === 0 && (
               <p className="text-[13px] text-muted">No members yet — add your first teammate above.</p>
             )}

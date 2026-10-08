@@ -1,6 +1,6 @@
 // Client side of Atlassian SSO: tiny status probe + the silent Firebase
 // sign-in. The server (server/ssoPlugin.js) owns all tokens.
-import { firebaseEnabled } from './firebase.js'
+import { auth, firebaseEnabled } from './firebase.js'
 
 // Sync-readable flag for UI copy (set once the status probe resolves).
 export const ssoFlags = { sso: false }
@@ -35,4 +35,17 @@ export async function ssoSession() {
 
 export function ssoLogout() {
   return fetch('/auth/logout', { method: 'POST' }).catch(() => {})
+}
+
+// Whitelist listing (Firebase Auth users) for Teamage — null when SSO is off
+// or the caller has no session.
+export async function fetchAuthUsers() {
+  try {
+    const idToken = await auth?.currentUser?.getIdToken().catch(() => null)
+    const r = await fetch('/auth/users', idToken ? { headers: { Authorization: `Bearer ${idToken}` } } : undefined)
+    if (!r.ok) return null
+    return (await r.json()).users || []
+  } catch {
+    return null
+  }
 }

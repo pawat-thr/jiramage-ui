@@ -108,6 +108,28 @@ export default function ssoPlugin(env) {
     return (await r.json()).users?.[0] || null
   }
 
+  // The whole whitelist (Firebase Auth users) — for Teamage's "people
+  // without a team" picker. Paginated; teams are small.
+  async function listAuthEmails() {
+    const cred = serviceCred()
+    const token = await googleAccessToken()
+    const emails = []
+    let pageToken = ''
+    for (let i = 0; i < 10; i++) {
+      const q = new URLSearchParams({ maxResults: '500', ...(pageToken ? { nextPageToken: pageToken } : {}) })
+      const r = await fetch(
+        `https://identitytoolkit.googleapis.com/v1/projects/${cred.project_id}/accounts:batchGet?${q}`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      )
+      if (!r.ok) throw new Error(`user list failed: HTTP ${r.status}`)
+      const j = await r.json()
+      for (const u of j.users || []) if (u.email) emails.push(u.email.toLowerCase())
+      if (!j.nextPageToken) break
+      pageToken = j.nextPageToken
+    }
+    return emails.sort()
+  }
+
   // Firebase custom token = a documented RS256 JWT shape; the client
   // exchanges it via signInWithCustomToken.
   function mintCustomToken(uid) {
@@ -304,6 +326,27 @@ export default function ssoPlugin(env) {
             // mint FRESH each call (sub-ms local signing) — a token stored at
             // callback time would be dead after its 1h exp
             return json(res, 200, { customToken: mintCustomToken(sess.uid), email: sess.email })
+          }
+          if (url.pathname === '/auth/users') {
+            // auth: an SSO session OR a verified Firebase ID token (the
+            // Firebase login survives dev-server restarts; the in-memory
+            // session does not — the picker must work in both states)
+            let allowed = Boolean(sessionOf(req))
+            const idToken = /^Bearer (.+)$/.exec(req.headers.authorization || '')?.[1]
+            if (!allowed && idToken) {
+              const cred = serviceCred()
+              const r = await fetch(
+                `https://identitytoolkit.googleapis.com/v1/projects/${cred.project_id}/accounts:lookup`,
+                {
+                  method: 'POST',
+                  headers: { Authorization: `Bearer ${await googleAccessToken()}`, 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ idToken }),
+                },
+              )
+              allowed = r.ok && Boolean((await r.json()).users?.length)
+            }
+            if (!allowed) return json(res, 401, { error: 'sign in first' })
+            return json(res, 200, { users: await listAuthEmails() })
           }
           if (url.pathname === '/auth/logout' && req.method === 'POST') {
             sessions.delete(cookieSid(req) || '')

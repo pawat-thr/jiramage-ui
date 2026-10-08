@@ -58,6 +58,35 @@ export function applyTeamRoster(membership, selfEmail) {
   CFG.teamEmails = membership.members
 }
 
+// Which team (if any) is this email in — lead OR member. Used to enforce
+// ONE TEAM PER PERSON when adding members.
+export async function teamOf(email) {
+  const lower = String(email || '').toLowerCase()
+  const lead = leadTeamOf(lower)
+  if (lead) return { team: lead, role: 'lead' }
+  for (const team of CFG.teams) {
+    const snap = await getDoc(memberDoc(team, lower))
+    if (snap.exists()) return { team, role: 'member' }
+  }
+  return null
+}
+
+// Pure diff: whitelist emails that are in NO team (pickable in Teamage).
+export const unassignedOf = (allEmails, takenEmails) => {
+  const taken = new Set(takenEmails.map((e) => e.toLowerCase()))
+  return (allEmails || []).filter((e) => !taken.has(e.toLowerCase()))
+}
+
+// Everyone already in SOME team (members of every team + every lead).
+export async function allTakenEmails() {
+  const taken = [...(CFG.teamLeads || [])]
+  for (const team of CFG.teams) {
+    const snap = await getDocs(collection(db, 'teams', team, 'members'))
+    snap.forEach((d) => taken.push(d.id))
+  }
+  return taken
+}
+
 export const watchMembers = (team, cb, onError = () => {}) =>
   onSnapshot(
     collection(db, 'teams', team, 'members'),
