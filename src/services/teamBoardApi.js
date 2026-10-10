@@ -11,18 +11,19 @@ import {
   writeBatch,
 } from 'firebase/firestore'
 import { db } from './firebase.js'
+import { teamStamp, inActiveTeam } from './teamsApi.js'
 
 // ---- labels ----
 export function watchLabels(cb, onError) {
   return onSnapshot(
     query(collection(db, 'labels'), orderBy('name', 'asc')),
-    (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+    (snap) => cb(snap.docs.filter((d) => inActiveTeam(d.data())).map((d) => ({ id: d.id, ...d.data() }))),
     onError,
   )
 }
 
 export function createLabel(data) {
-  return addDoc(collection(db, 'labels'), { ...data, createdAt: serverTimestamp() })
+  return addDoc(collection(db, 'labels'), { ...data, ...teamStamp(), createdAt: serverTimestamp() })
 }
 
 // Rename a label AND retag every task using it, atomically (one batch).
@@ -44,7 +45,7 @@ export function deleteLabel(labelId) {
 export function watchTasks(cb, onError) {
   return onSnapshot(
     query(collection(db, 'tasks'), orderBy('createdAt', 'desc')),
-    (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+    (snap) => cb(snap.docs.filter((d) => inActiveTeam(d.data())).map((d) => ({ id: d.id, ...d.data() }))),
     onError,
   )
 }
@@ -52,6 +53,7 @@ export function watchTasks(cb, onError) {
 export function createTask(data) {
   return addDoc(collection(db, 'tasks'), {
     ...data,
+    ...teamStamp(),
     status: 'todo',
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),

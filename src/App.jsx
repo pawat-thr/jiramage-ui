@@ -1,4 +1,4 @@
-import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import Sidebar from './components/layout/Sidebar.jsx'
 import TopBar from './components/layout/TopBar.jsx'
@@ -39,9 +39,6 @@ import { CFG, teamMembers } from './config/appConfig.js'
 import { ssoStatus } from './services/ssoClient.js'
 import { teamsEnabled, resolveMembership, applyTeamRoster } from './services/teamsApi.js'
 
-// Main-mode Capacity Planner plans for the whole dev team roster.
-const TEAM_PLAN_EMAILS = teamMembers()
-
 // PR Review needs Firebase (multi-user Firestore); it only appears in team mode.
 const NAV_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', path: '/' },
@@ -80,6 +77,7 @@ export default function App() {
   //  - first run (no cache): gate on the fetch, capped at 4s → then proceed
   //    with .env values (the fetch still fills the cache when it lands)
   const appliedCfgRef = useRef(null) // the raw doc that was overlaid (null = .env only)
+  const freshCfgRef = useRef(null) // the latest doc fetched from Firestore this session
   const [cfgReady, setCfgReady] = useState(() => {
     if (!firebaseEnabled) return true
     const cached = cachedTeamConfig()
@@ -107,7 +105,21 @@ export default function App() {
     resolveMembership(auth.user.email)
       .then((m) => {
         if (!on) return
-        if (m) applyTeamRoster(m, auth.user.email)
+        if (m) {
+          applyTeamRoster(m, auth.user.email)
+          // team now active → second overlay pass so the PER-TEAM config
+          // fields (JIRA_PROJECT__<team>, …) win over the shared values.
+          // Pages haven't rendered yet (both gates below still closed), so
+          // this never swaps CFG under a live tree. If the config doc lands
+          // AFTER this, its own applyTeamConfig runs with the team already
+          // active — either order ends with both layers applied.
+          if (appliedCfgRef.current) applyTeamConfig(appliedCfgRef.current)
+          // and re-run the staleness check: if the fetch landed BEFORE the
+          // team was known, configDiffers compared only plain keys then —
+          // compare again now that the team's own keys count.
+          if (freshCfgRef.current && configDiffers(freshCfgRef.current, appliedCfgRef.current))
+            setCfgStale(true)
+        }
         setMembership(m || { none: true })
       })
       // a FAILED lookup is not "no team" — say what broke (usually: the
@@ -131,6 +143,7 @@ export default function App() {
     loadTeamConfig()
       .then((data) => {
         if (!on) return
+        freshCfgRef.current = data
         cacheTeamConfig(data)
         if (appliedCfgRef.current == null) {
           // still gating (first run) → the fresh values apply right now
@@ -250,6 +263,11 @@ export default function App() {
 }
 
 function AppShell({ user, onLogout, membership }) {
+  // Capacity Planner roster: AppShell mounts only after the membership gate,
+  // so the team roster overlay is already on CFG — never computed at module
+  // load, where it would freeze the pre-overlay env roster and leak every
+  // team into the planner. Keyed on membership so identity stays stable.
+  const planEmails = useMemo(() => teamMembers(), [membership]) // eslint-disable-line react-hooks/exhaustive-deps
   // The URL is the source of truth for the active page.
   const location = useLocation()
   const navigate = useNavigate()
@@ -387,7 +405,7 @@ function AppShell({ user, onLogout, membership }) {
             />
           )}
           {tab === 'gen' && <SubtaskGenPage onNotify={showToast} />}
-          {tab === 'capacity' && <CapacityPage onNotify={showToast} emails={TEAM_PLAN_EMAILS} />}
+          {tab === 'capacity' && <CapacityPage onNotify={showToast} emails={planEmails} />}
           {tab === 'board' && <TeamBoardPage user={user} onNotify={showToast} />}
           {tab === 'pr' && <PrBoardPage user={user} onNotify={showToast} />}
           {tab === 'integration' && (

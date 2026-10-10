@@ -10,6 +10,7 @@ import {
   serverTimestamp,
 } from 'firebase/firestore'
 import { db } from './firebase.js'
+import { teamStamp, inActiveTeam } from './teamsApi.js'
 
 const notifCol = () => collection(db, 'notifications')
 const notifDoc = (id) => doc(db, 'notifications', id)
@@ -20,7 +21,7 @@ export function watchInbox(toEmail, cb, onError) {
   return onSnapshot(
     query(notifCol(), where('toEmail', '==', toEmail)),
     (snap) => {
-      const items = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+      const items = snap.docs.filter((d) => inActiveTeam(d.data())).map((d) => ({ id: d.id, ...d.data() }))
       items.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))
       cb(items)
     },
@@ -65,6 +66,7 @@ export function sendNotifications({ type, toEmails, from, refId, title, extra = 
   const batch = writeBatch(db)
   for (const toEmail of targets) {
     batch.set(doc(notifCol()), {
+      ...teamStamp(), // inbox history stays with the team it happened in
       type,
       toEmail,
       fromEmail: from.email,

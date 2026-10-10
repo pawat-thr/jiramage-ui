@@ -13,6 +13,7 @@ import {
 import { db, firebaseEnabled } from './firebase.js'
 import { CFG } from '../config/appConfig.js'
 import { CONFIG_FIELDS, parseFieldRaw, validateFieldRaw } from '../config/configFields.js'
+import { activeTeamSlug } from './teamsApi.js'
 
 // Team config in Firestore (settings/config): the movable .env fields, stored
 // as RAW env-style strings under their env names. Per-field precedence:
@@ -22,8 +23,25 @@ import { CONFIG_FIELDS, parseFieldRaw, validateFieldRaw } from '../config/config
 // REQUIRED field (no Firebase, no .env, no default) blocks the app with a
 // config-error screen. Field definitions/parsers live in configFields.js,
 // shared with vite.config.js so build-time and runtime parsing can't diverge.
+//
+// PER-TEAM fields (f.perTeam): with teams active, each team keeps its own
+// value as `<ENV>__<team>` on the SAME doc (like promptTemplate_<team>), and
+// the team's value wins:  team Firebase > shared Firebase > .env > default.
+// The team layer applies in a SECOND applyTeamConfig pass after the roster
+// resolves (App.jsx) — the boot pass runs before the team is known.
 
 export { CONFIG_FIELDS, validateFieldRaw }
+
+// Where this field is read/written right now: its team key when teams are
+// active and the field is per-team, otherwise the classic shared env key.
+export const storeKeyOf = (f) =>
+  f.perTeam && activeTeamSlug() ? `${f.env}__${activeTeamSlug()}` : f.env
+
+// Keys that can carry this field's value, strongest first.
+const keysOf = (f) => {
+  const k = storeKeyOf(f)
+  return k === f.env ? [f.env] : [k, f.env]
+}
 
 // Current EFFECTIVE CFG value rendered back as an env-style string.
 export function cfgToRaw(f) {
@@ -76,24 +94,30 @@ export function cacheTeamConfig(data) {
 }
 
 // Field-wise comparison (trimmed): does `fresh` change anything vs `applied`?
+// Per-team fields also compare the active team's key — a change to another
+// team's value never prompts this team to reload.
 export const configDiffers = (fresh, applied) =>
-  CONFIG_FIELDS.some(
-    (f) => String(fresh?.[f.env] ?? '').trim() !== String(applied?.[f.env] ?? '').trim(),
+  CONFIG_FIELDS.some((f) =>
+    keysOf(f).some((k) => String(fresh?.[k] ?? '').trim() !== String(applied?.[k] ?? '').trim()),
   )
 
 // Overlays Firebase values onto CFG (mutates it — CFG is read at render/call
 // time everywhere, so mutating before the app renders applies globally).
-// Empty/invalid values are skipped → the .env value stands.
+// Empty/invalid values are skipped → the next-weaker value stands. For a
+// per-team field the team's value is tried first, then the shared one.
 export function applyTeamConfig(data) {
   snapshotEnvBaseline()
   const applied = []
   for (const f of CONFIG_FIELDS) {
-    const raw = data?.[f.env]
-    if (raw == null || String(raw).trim() === '') continue
-    const parsed = parseFieldRaw(f, raw)
-    if (parsed == null || (Array.isArray(parsed) && !parsed.length)) continue
-    CFG[f.key] = parsed
-    applied.push(f.env)
+    for (const k of keysOf(f)) {
+      const raw = data?.[k]
+      if (raw == null || String(raw).trim() === '') continue
+      const parsed = parseFieldRaw(f, raw)
+      if (parsed == null || (Array.isArray(parsed) && !parsed.length)) continue
+      CFG[f.key] = parsed
+      applied.push(k)
+      break
+    }
   }
   return applied
 }
@@ -109,7 +133,9 @@ export const missingRequired = () =>
 
 export async function saveTeamConfig(data) {
   await setDoc(doc(db, 'settings', 'config'), data, { merge: true })
-  cacheTeamConfig(data) // the save-triggered reload must boot with the fresh values
+  // the save-triggered reload must boot with the fresh values — merged into
+  // the cached doc, since a save may carry only one editor box's keys
+  cacheTeamConfig({ ...(cachedTeamConfig() || {}), ...data })
 }
 
 // ---- audit log: who changed the team config ----
@@ -121,10 +147,12 @@ const historyCol = () => collection(db, 'settings', 'config', 'history')
 
 export function logConfigChange(byEmail, before, after) {
   const changes = {}
-  for (const f of CONFIG_FIELDS) {
-    const from = String(before?.[f.env] ?? '').trim()
-    const to = String(after?.[f.env] ?? '').trim()
-    if (from !== to) changes[f.env] = { from, to }
+  // diff only the keys this save actually carried — a save from one editor
+  // box must not log the other box's fields as "cleared"
+  for (const k of Object.keys(after || {})) {
+    const from = String(before?.[k] ?? '').trim()
+    const to = String(after?.[k] ?? '').trim()
+    if (from !== to) changes[k] = { from, to }
   }
   if (!Object.keys(changes).length) return Promise.resolve(null)
   return addDoc(historyCol(), { by: byEmail || 'unknown', at: serverTimestamp(), changes })

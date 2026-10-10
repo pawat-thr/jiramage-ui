@@ -60,17 +60,20 @@ export function parseWorkDays(str) {
 // decision (this team always scopes to projects); teamFrom is additionally
 // protected by vite's built-in default, so its flag is a safety net in case
 // that default is ever removed.
+// `perTeam`: with teams active this field is stored PER TEAM (as
+// `<ENV>__<team>` on the same settings/config doc) and the team's value wins
+// over the shared one: team Firebase > shared Firebase > .env > default.
 export const CONFIG_FIELDS = [
   { env: 'REFRESH_INTERVAL', key: 'refreshMs', kind: 'interval', hint: 'e.g. 5m, 30s, 1h' },
-  { env: 'JIRA_PROJECT', key: 'projects', kind: 'listUpper', required: true, hint: 'Jira project keys, comma-separated (e.g. APP, DX)' },
-  { env: 'JIRA_TEAM_FROM', key: 'teamFrom', kind: 'text', required: true, pattern: /^\d{4}-\d{2}-\d{2}$/, patternHint: 'a date like 2024-05-01', hint: 'only issues created since this date (YYYY-MM-DD)' },
-  { env: 'CONFLUENCE_SPEC_SPACE', key: 'specSpace', kind: 'text', hint: 'Spec Wizard: Confluence space key (empty = all spaces)' },
+  { env: 'JIRA_PROJECT', key: 'projects', kind: 'listUpper', required: true, perTeam: true, hint: 'Jira project keys, comma-separated (e.g. APP, DX)' },
+  { env: 'JIRA_TEAM_FROM', key: 'teamFrom', kind: 'text', required: true, perTeam: true, pattern: /^\d{4}-\d{2}-\d{2}$/, patternHint: 'a date like 2024-05-01', hint: 'only issues created since this date (YYYY-MM-DD)' },
+  { env: 'CONFLUENCE_SPEC_SPACE', key: 'specSpace', kind: 'text', perTeam: true, hint: 'Spec Wizard: Confluence space key (empty = all spaces)' },
   { env: 'SUBTASK_PREFIX_BE', key: 'subtaskPrefixBe', kind: 'text', hint: 'Spec Wizard: BE subtask name prefix' },
   { env: 'SUBTASK_PREFIX_FE', key: 'subtaskPrefixFe', kind: 'text', hint: 'Spec Wizard: FE subtask name prefix' },
   { env: 'SUBTASK_PREFIX_QA', key: 'subtaskPrefixQa', kind: 'text', hint: 'Spec Wizard: QA subtask name prefix' },
   { env: 'INTEGRATION_ROLES', key: 'integrationRoles', kind: 'list', hint: 'Integration Plan target-date columns (e.g. BE, WEB, MOB)' },
-  { env: 'BURN_STATUSES', key: 'burnStatuses', kind: 'list', hint: 'statuses that count as "in development" for burn' },
-  { env: 'BURN_FINISHED_STATUSES', key: 'burnFinishedStatuses', kind: 'list', hint: 'post-dev statuses where burn shows frozen ("used")' },
+  { env: 'BURN_STATUSES', key: 'burnStatuses', kind: 'list', perTeam: true, hint: 'statuses that count as "in development" for burn' },
+  { env: 'BURN_FINISHED_STATUSES', key: 'burnFinishedStatuses', kind: 'list', perTeam: true, hint: 'post-dev statuses where burn shows frozen ("used")' },
   { env: 'WORK_TIME', key: 'workTime', kind: 'worktime', hint: 'burn working windows on work days (e.g. 09:30-12:00,13:00-18:30)' },
   { env: 'WORK_DAYS', key: 'workDays', kind: 'workdays', hint: 'working days for burn + capacity (e.g. Mon,Tue,Wed,Thu,Fri)' },
 ]

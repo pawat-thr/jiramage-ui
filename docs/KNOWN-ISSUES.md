@@ -60,3 +60,24 @@ boot-time cache applies instantly, the fresh doc is compared in the
 background). Nobody's running session hot-swaps config — by design, to avoid
 torn state. If someone says "the config change didn't work", the answer is:
 click the pill / reload.
+
+## 6. Team data isolation is client-side (0.1.9 draft)
+
+Team-rooted filtering (PRs/tasks/inbox/integration scoped to your current
+team) happens in the services, not in Firestore rules — any signed-in member
+could technically query another team's docs via the API. Same trust level as
+the lead checks; hardens in Phase A/C when rules become membership-aware.
+It also costs bandwidth as teams grow: the realtime watchers subscribe to
+whole collections and filter in memory, so every browser downloads (and
+re-receives on every write) all teams' docs. Fine at 1-2 teams; Phase A's
+per-team tree (or a `where('team'==…)` + composite indexes) scopes reads
+server-side.
+
+## 7. Turning TEAMS off after using teams merges all teams' data
+
+The teams-off passthrough shows EVERY doc (all teams' PRs, tasks, inbox,
+plans) — that's correct for a fresh install, but downgrading an installation
+that already ran multiple teams merges their histories in one view, and the
+Integration Plan can show the same release+story twice (one row per team).
+Don't remove `TEAMS` from a multi-team deployment; to really sunset a team,
+keep TEAMS and remove its members instead.

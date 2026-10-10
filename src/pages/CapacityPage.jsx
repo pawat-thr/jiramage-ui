@@ -3,7 +3,7 @@ import ModalShell from '../components/common/ModalShell.jsx'
 import IssueDetailModal from '../features/issues/IssueDetailModal.jsx'
 import Spinner from '../components/common/Spinner.jsx'
 import FilterMenu from '../components/common/FilterMenu.jsx'
-import { fetchTeamIssues, fetchUnassignedIssues, fetchStories, assignIssue, browseUrl, resolveAccountIds } from '../services/jiraApi.js'
+import { fetchTeamIssues, fetchUnassignedIssues, fetchStoriesByKeys, assignIssue, browseUrl, resolveAccountIds } from '../services/jiraApi.js'
 import { loadPlans, savePlan } from '../services/qaPlanApi.js'
 import { firebaseEnabled } from '../services/firebase.js'
 import {
@@ -44,6 +44,30 @@ const traceTask = (key, on) => {
 const DAY_MIN = 'min-w-[92px]'
 const LEFT_COL = 'sticky left-0 z-10 min-w-[280px] max-w-[280px] border-r border-line bg-panel'
 
+// Jira issues → plannable task map. SUBTASKS ONLY: stories/bugs with points
+// must not appear as plannable work (a story's points duplicate its
+// subtasks'). Story names still show — group headers read them from each
+// subtask's parent field.
+function toTaskMap(issues, idToEmail = {}) {
+  const map = {}
+  for (const i of issues) {
+    if (!i.fields.parent) continue
+    const pts = Number(i.fields[CFG.pointField]) || 0
+    if (!pts) continue
+    map[i.key] = {
+      key: i.key,
+      summary: i.fields.summary,
+      points: pts,
+      status: i.fields.status?.name || '',
+      statusCategory: i.fields.status?.statusCategory?.key || 'new',
+      assignee: i.fields.assignee?.emailAddress || idToEmail[i.fields.assignee?.accountId] || '',
+      storyKey: i.fields.parent?.key || null,
+      storySummary: i.fields.parent?.fields?.summary || null,
+    }
+  }
+  return map
+}
+
 function Avatar({ email, size = 'size-6', text = 'text-[10px]' }) {
   return (
     <SharedAvatar
@@ -78,6 +102,10 @@ export default function CapacityPage({
   const [dockOpen, setDockOpen] = useState(true)
   const [capOpen, setCapOpen] = useState(true)
   const [showUnassigned, setShowUnassigned] = useState(false)
+  // Unassigned subtasks are NOT fetched on first load (the page opens with
+  // only the team's own work) — the dock's "unassigned" button fetches them
+  // on demand, then toggles visibility like before.
+  const [unassignedState, setUnassignedState] = useState('idle') // idle | loading | loaded
   const [release, setRelease] = useState('')
   const [storyReleases, setStoryReleases] = useState({}) // storyKey -> [release names]
   const [emailToId, setEmailToId] = useState({}) // member email -> Jira accountId (for assign-on-drop)
@@ -88,42 +116,68 @@ export default function CapacityPage({
     // accountId → email fallback: Atlassian privacy settings can hide a user's
     // emailAddress in API responses even though JQL matched it — without this,
     // their subtasks would wrongly show as "no assignee".
-    Promise.all([fetchIssues(), fetchUnassignedIssues(), resolveAccountIds(emails), fetchStories()])
-      .then(([assigned, unassigned, ids, stories]) => {
+    // First load is the TEAM's work only — unassigned subtasks (grooming
+    // output) are fetched on demand by the dock's "unassigned" button — and
+    // release names are fetched only for THESE tasks' parent stories (a `key
+    // in (…)` lookup), never the whole story backlog.
+    Promise.all([fetchIssues(), resolveAccountIds(emails)])
+      .then(async ([assigned, ids]) => {
         if (!on) return
         setEmailToId(ids)
-        setStoryReleases(Object.fromEntries(stories.map((st) => [st.key, releaseNames(st)])))
         const idToEmail = Object.fromEntries(
           Object.entries(ids).filter(([, id]) => id).map(([e, id]) => [id, e]),
         )
-        // team's issues + fresh unassigned subtasks (grooming output, see below)
-        const issues = [...assigned, ...unassigned]
-        const map = {}
-        for (const i of issues) {
-          // SUBTASKS ONLY: stories/bugs with points must not appear as plannable
-          // work (a story's points duplicate its subtasks'). Story names still
-          // show — group headers read them from each subtask's parent field.
-          if (!i.fields.parent) continue
-          const pts = Number(i.fields[CFG.pointField]) || 0
-          if (!pts) continue
-          map[i.key] = {
-            key: i.key,
-            summary: i.fields.summary,
-            points: pts,
-            status: i.fields.status?.name || '',
-            statusCategory: i.fields.status?.statusCategory?.key || 'new',
-            assignee: i.fields.assignee?.emailAddress || idToEmail[i.fields.assignee?.accountId] || '',
-            storyKey: i.fields.parent?.key || null,
-            storySummary: i.fields.parent?.fields?.summary || null,
-          }
-        }
+        const map = toTaskMap(assigned, idToEmail)
         setTasks(map)
+        await loadReleases(Object.values(map), () => on)
       })
       .catch((err) => on && onNotify(err.message, true))
     return () => {
       on = false
     }
   }, [])
+
+  // Fetch release names for any story keys we haven't resolved yet and merge
+  // them in. Failure only degrades the Release filter — never block the page.
+  const loadReleases = async (taskList, alive = () => true) => {
+    const missing = [...new Set(taskList.map((t) => t.storyKey).filter(Boolean))]
+    const unknown = missing.filter((k) => !(k in storyReleases))
+    if (!unknown.length) return
+    try {
+      const stories = await fetchStoriesByKeys(unknown)
+      if (!alive()) return
+      setStoryReleases((r) => ({
+        ...r,
+        ...Object.fromEntries(stories.map((st) => [st.key, releaseNames(st)])),
+      }))
+    } catch {
+      // release chips just stay empty for these stories
+    }
+  }
+
+  // The dock's "unassigned" button: first press fetches the unassigned
+  // subtasks and shows them; afterwards it just toggles visibility.
+  const toggleUnassigned = () => {
+    if (unassignedState === 'loading') return
+    if (unassignedState === 'loaded') {
+      setShowUnassigned((v) => !v)
+      return
+    }
+    setUnassignedState('loading')
+    fetchUnassignedIssues()
+      .then((issues) => {
+        const fresh = toTaskMap(issues)
+        // team tasks win on a key collision (shouldn't happen: these have no assignee)
+        setTasks((m) => ({ ...fresh, ...m }))
+        setUnassignedState('loaded')
+        setShowUnassigned(true)
+        loadReleases(Object.values(fresh))
+      })
+      .catch((err) => {
+        setUnassignedState('idle')
+        onNotify(err.message, true)
+      })
+  }
 
   useEffect(() => {
     let on = true
@@ -524,23 +578,28 @@ export default function CapacityPage({
               Unplanned <span className="text-muted">({dockShown.length} tasks · {dockShown.reduce((a, t) => a + t.left, 0)} pt)</span>
             </span>
             <span className="flex items-center gap-2 text-[13px] text-muted">
-              {unassignedCount > 0 && (
-                <button
-                  className={cx(
-                    'rounded-full border px-2.5 py-0.5 text-[12px]',
-                    showUnassigned
-                      ? 'border-amber/50 bg-amber-soft font-medium text-amber'
-                      : 'border-line bg-field text-muted hover:text-ink',
-                  )}
-                  title="Fresh from grooming: subtasks nobody is assigned to yet. Drop one on a member's capacity row to assign it in Jira AND plan it."
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setShowUnassigned((v) => !v)
-                  }}
-                >
-                  unassigned ({unassignedCount}) {showUnassigned ? '▾' : '▴'}
-                </button>
-              )}
+              <button
+                className={cx(
+                  'rounded-full border px-2.5 py-0.5 text-[12px]',
+                  showUnassigned && unassignedState === 'loaded'
+                    ? 'border-amber/50 bg-amber-soft font-medium text-amber'
+                    : 'border-line bg-field text-muted hover:text-ink',
+                  unassignedState === 'loading' && 'cursor-wait opacity-60',
+                )}
+                title={
+                  unassignedState === 'loaded'
+                    ? "Fresh from grooming: subtasks nobody is assigned to yet. Drop one on a member's capacity row to assign it in Jira AND plan it."
+                    : 'Load the subtasks nobody is assigned to yet (fresh from grooming) — not fetched until you ask'
+                }
+                onClick={(e) => {
+                  e.stopPropagation()
+                  toggleUnassigned()
+                }}
+              >
+                {unassignedState === 'idle' && 'load unassigned ▸'}
+                {unassignedState === 'loading' && 'loading unassigned…'}
+                {unassignedState === 'loaded' && `unassigned (${unassignedCount}) ${showUnassigned ? '▾' : '▴'}`}
+              </button>
               <span>drag onto a capacity cell to plan · ⚡ = auto-plan for its assignee · {dockOpen ? 'hide ▾' : 'show ▴'}</span>
             </span>
           </div>

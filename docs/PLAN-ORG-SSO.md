@@ -74,7 +74,15 @@ Email/password login + change-password UI get DELETED (Atlassian owns auth).
 
 ---
 
-## Phase A — Firestore tree per team ⬜
+## Phase A — Firestore tree per team 🔶 (per-team CONFIG shipped in 0.1.9: flat-key draft, not the tree yet)
+
+Shipped so far (flat-doc draft, same idea different storage): six settings
+are per team today — Dev Prompt (`promptTemplate_{team}`) + JIRA_PROJECT,
+JIRA_TEAM_FROM, CONFLUENCE_SPEC_SPACE, BURN_STATUSES,
+BURN_FINISHED_STATUSES as `<ENV>__<team>` keys on `settings/config`, with
+precedence team > shared > .env > default. Data isolation also shipped
+flat (team-stamped docs, client-filtered). What REMAINS for Phase A proper
+is the tree restructure + server-side rules below.
 
 Pure restructure, no new UX. App keeps working exactly as today on `mp.`.
 

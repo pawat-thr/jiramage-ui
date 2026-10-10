@@ -9,15 +9,20 @@ import {
   serverTimestamp,
 } from 'firebase/firestore'
 import { db } from './firebase.js'
+import { teamStamp, inActiveTeam, activeTeamSlug } from './teamsApi.js'
 
 // Integration Plan rows live in Firestore (one doc per release+story) and are
 // loaded on demand — no realtime listener by design.
 const col = () => collection(db, 'integration')
-const rowId = (release, key) => encodeURIComponent(`${release}|${key}`)
+// New row ids include the team so two teams can track the SAME release
+// independently (legacy pre-team ids keep working — lookups go via query).
+const rowId = (release, key) =>
+  encodeURIComponent(`${activeTeamSlug() ? activeTeamSlug() + '|' : ''}${release}|${key}`)
 
 export async function fetchPlan(release) {
   const snap = await getDocs(query(col(), where('release', '==', release)))
   return snap.docs
+    .filter((d) => inActiveTeam(d.data()))
     .map((d) => ({ id: d.id, ...d.data() }))
     .sort((a, b) => a.key.localeCompare(b.key, undefined, { numeric: true }))
 }
@@ -38,6 +43,7 @@ export async function syncPlan(release, jiraStories, existingRows) {
     const stored = storedByKey.get(s.key)
     if (!stored) {
       ops.push((b) => b.set(doc(col(), rowId(release, s.key)), {
+        ...teamStamp(),
         release,
         key: s.key,
         name: s.fields.summary,

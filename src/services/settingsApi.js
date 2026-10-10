@@ -1,10 +1,15 @@
 import { doc, onSnapshot, setDoc } from 'firebase/firestore'
 import { db, firebaseEnabled } from './firebase.js'
+import { activeTeamSlug } from './teamsApi.js'
 
 // Team-wide (global) app settings, shared by every member via Firestore.
 // Individual mode (no Firebase) falls back to this browser's localStorage.
 
 const LS_KEY = 'jiramage-prompt-template'
+
+// Teams active → each team has its own template (one field per team on the
+// same settings/global doc); teams off → the classic shared field.
+const FIELD = () => (activeTeamSlug() ? `promptTemplate_${activeTeamSlug()}` : 'promptTemplate')
 
 export const DEFAULT_PROMPT_TEMPLATE =
   'help me to enhance {link} use skill unit test after implement'
@@ -27,7 +32,7 @@ export function watchPromptTemplate(cb, onError = () => {}) {
   }
   return onSnapshot(
     doc(db, 'settings', 'global'),
-    (snap) => cb(snap.data()?.promptTemplate || DEFAULT_PROMPT_TEMPLATE),
+    (snap) => cb(snap.data()?.[FIELD()] || DEFAULT_PROMPT_TEMPLATE),
     onError,
   )
 }
@@ -38,5 +43,5 @@ export function savePromptTemplate(template) {
     localWatchers.forEach((notify) => notify())
     return Promise.resolve()
   }
-  return setDoc(doc(db, 'settings', 'global'), { promptTemplate: template }, { merge: true })
+  return setDoc(doc(db, 'settings', 'global'), { [FIELD()]: template }, { merge: true })
 }

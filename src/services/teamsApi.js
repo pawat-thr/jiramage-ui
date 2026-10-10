@@ -50,12 +50,25 @@ export async function memberEmails(team) {
   return [...out]
 }
 
+// ---- team-rooted data scoping ----
+// Every Firestore record created while teams are active is STAMPED with the
+// creator's team; reads filter to the viewer's CURRENT team. Data belongs to
+// the team it was born in: move teams and the old team's PRs/tasks/inbox
+// history disappear for you (even your own) — they're the team's, not yours.
+let activeTeam = null
+export const activeTeamSlug = () => activeTeam
+export const teamStamp = () => (activeTeam ? { team: activeTeam } : {})
+// Teams ON → only my team's docs (untagged legacy docs are invisible — the
+// migration stamps them). Teams OFF → everything, exactly as before.
+export const inActiveTeam = (data) => (activeTeam ? data?.team === activeTeam : true)
+
 // The data-scoping overlay: once membership is known, the team's member list
 // BECOMES the roster (CFG.teamEmails) — every page (dashboards, Team Task,
 // planner, pickers) shows THIS team with zero call-site changes.
 export function applyTeamRoster(membership, selfEmail) {
   CFG.email = selfEmail || CFG.email
   CFG.teamEmails = membership.members
+  activeTeam = membership.team
 }
 
 // Which team (if any) is this email in — lead OR member. Used to enforce

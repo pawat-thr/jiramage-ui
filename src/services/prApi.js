@@ -10,6 +10,7 @@ import {
   serverTimestamp,
 } from 'firebase/firestore'
 import { db } from './firebase.js'
+import { teamStamp, inActiveTeam } from './teamsApi.js'
 
 const prCol = () => collection(db, 'prs')
 const prDoc = (id) => doc(db, 'prs', id)
@@ -19,7 +20,7 @@ const commentsCol = (prId) => collection(db, 'prs', prId, 'comments')
 export function watchPRs(cb, onError) {
   return onSnapshot(
     query(prCol(), orderBy('createdAt', 'desc')),
-    (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+    (snap) => cb(snap.docs.filter((d) => inActiveTeam(d.data())).map((d) => ({ id: d.id, ...d.data() }))),
     onError,
   )
 }
@@ -27,6 +28,7 @@ export function watchPRs(cb, onError) {
 export function createPR(data) {
   return addDoc(prCol(), {
     ...data,
+    ...teamStamp(), // PRs belong to the team they were opened in
     status: 'open',
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),

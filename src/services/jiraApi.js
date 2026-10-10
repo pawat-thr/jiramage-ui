@@ -54,6 +54,21 @@ export function fetchStories() {
   )
 }
 
+// Release field for SPECIFIC stories only (`key in (…)`), chunked and fetched
+// in parallel. The Capacity Planner needs releases just for the parent
+// stories of its plannable subtasks — fetching ALL stories (thousands, ~20
+// sequential pages) made its first load take seconds.
+export async function fetchStoriesByKeys(keys) {
+  const unique = [...new Set(keys)].filter(Boolean)
+  if (!unique.length) return []
+  const chunks = []
+  for (let i = 0; i < unique.length; i += 100) chunks.push(unique.slice(i, i + 100))
+  const pages = await Promise.all(
+    chunks.map((c) => searchAll(`key in (${quote(c)})`, [CFG.releaseField])),
+  )
+  return pages.flat()
+}
+
 export function fetchTeamIssues() {
   const emails = teamMembers()
   const jql =
@@ -342,9 +357,15 @@ export async function fetchChangelog(key) {
 // first, the team assigns by effort after) — assignee-filtered fetches never
 // see them. This pulls the recent unassigned issues so the Capacity Planner
 // can show them for assign-by-effort.
+// Unassigned PLANNABLE work for the Capacity Planner: subtasks only (the
+// planner plans nothing else — stories/tasks are dropped by its mapper) and
+// not yet done (the dock hides done anyway). The unfiltered version matched
+// every unassigned issue since teamFrom (~14 pages) for nothing.
 export function fetchUnassignedIssues() {
   const jql =
-    projectFilter() + `assignee is EMPTY AND created >= "${CFG.teamFrom}" ORDER BY key DESC`
+    projectFilter() +
+    `assignee is EMPTY AND issuetype in subtaskIssueTypes() AND statusCategory != Done` +
+    ` AND created >= "${CFG.teamFrom}" ORDER BY key DESC`
   return searchAll(jql, ['summary', 'status', 'priority', 'assignee', 'issuetype', 'parent', CFG.pointField])
 }
 

@@ -139,6 +139,17 @@ try {
     return !!document.querySelector('table') && t.includes('Unplanned') && t.includes('Task / Capacity')
   }))
 
+  // lazy unassigned: NOT fetched at first load — the dock button fetches on demand
+  ok('capacity: unassigned not loaded on first paint', await page.evaluate(
+    () => [...document.querySelectorAll('button')].some((b) => b.textContent.includes('load unassigned')),
+  ))
+  await page.evaluate(() => [...document.querySelectorAll('button')].find((b) => b.textContent.includes('load unassigned'))?.click())
+  await page.waitForFunction(
+    () => [...document.querySelectorAll('button')].some((b) => /unassigned \(\d+\)/.test(b.textContent)),
+    { timeout: 60000 },
+  )
+  ok('capacity: button fetches unassigned on demand', true)
+
   // ---- subtask detail overlay (from team task) ----
   await page.goto(BASE + '/team-task', { waitUntil: 'networkidle0' })
   await sleep(1200)
@@ -161,6 +172,9 @@ try {
   ok('settings zones render', s.includes('Fixed configuration') && s.includes('Dev Prompt'))
   ok('settings team config lists the movable fields',
     ['REFRESH_INTERVAL', 'JIRA_PROJECT', 'WORK_TIME', 'BURN_STATUSES'].every((k) => s.includes(k)))
+  // individual mode keeps the FULL fixed-config reference (team mode trims it)
+  ok('settings fixed sections render in full (individual mode)',
+    ['Connection', 'Team members', 'Auto-refresh interval', 'Individual (no Firebase env)'].every((k) => s.includes(k)))
 
   // ---- routing guards ----
   await page.goto(BASE + '/inbox', { waitUntil: 'networkidle0' })

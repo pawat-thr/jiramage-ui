@@ -2,7 +2,7 @@
 
 A web dashboard & team hub for Jira Cloud — the web rebuild of [jiramage](../jiramage), built with **React + Vite + Tailwind CSS**. Dark/light/system theming with a red accent, real URL routing, and two modes: **individual** (Jira only, zero setup beyond `.env`) and **team** (adds Firebase login + collaboration boards, notifications, shared settings, and planning tools). Teams (incl. QA) are managed in-app via **Teamage**.
 
-v0.1.8 · by MpLab · MIT License · full versions display clean (`v0.1.8`); pre-releases append the git build hash (`v0.1.9-beta.1+<hash>`)
+v0.1.8 · by MpLab · MIT License · full versions display clean (`v0.1.8`); pre-releases append the git build hash (`v0.1.9-beta.2+<hash>`)
 
 ---
 
